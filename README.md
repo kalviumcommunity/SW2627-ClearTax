@@ -358,8 +358,8 @@ Clear steps for reviewing and testing the implementation.
 
 | Member                           | Responsibility        |
 | -------------------------------- | --------------------- |
-| Garvit Singh (`@garvitsingh171`) | Team Lead / Developer |
-| Team Member 2                    | Developer             |
+| Garvit Singh (`@garvitsingh171`) | Backend Developer     |
+| Edha Singh (`@edhasingh125`)     | Frontend Developer    |
 
 > Responsibilities will evolve as issues are assigned during development.
 
