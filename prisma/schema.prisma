@@ -11,3 +11,184 @@ generator client {
 datasource db {
   provider = "postgresql"
 }
+
+enum ReferenceImportStatus {
+  QUEUED
+  PROCESSING
+  READY
+  FAILED
+}
+
+enum UploadBatchStatus {
+  QUEUED
+  PROCESSING
+  COMPLETED
+  COMPLETED_WITH_ERRORS
+  FAILED
+}
+
+enum RowProcessingStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+}
+
+enum ReconciliationResult {
+  PENDING
+  MATCHED
+  MISMATCHED
+  UNMATCHED
+  ERROR
+}
+
+enum RowErrorCode {
+  MISSING_INVOICE_NUMBER
+  INVALID_GSTIN
+  INVALID_INVOICE_DATE
+  INVALID_TAXABLE_VALUE
+  INVALID_IGST
+  INVALID_CGST
+  INVALID_SGST
+  INVALID_CESS
+  INVALID_TOTAL_VALUE
+  NEGATIVE_AMOUNT
+  DUPLICATE_IN_BATCH
+  MALFORMED_ROW
+}
+
+model User {
+  id         String     @id @default(uuid()) @db.Uuid
+  email      String     @unique
+  name       String?
+  businesses Business[]
+  createdAt  DateTime   @default(now())
+  updatedAt  DateTime   @updatedAt
+}
+
+model Business {
+  id               String            @id @default(uuid()) @db.Uuid
+  legalName        String
+  gstin            String            @unique @db.VarChar(15)
+  ownerId          String            @db.Uuid
+  owner            User              @relation(fields: [ownerId], references: [id], onDelete: Restrict)
+  referenceImports ReferenceImport[]
+  uploadBatches    UploadBatch[]
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+
+  @@index([ownerId])
+}
+
+model ReferenceImport {
+  id                String                @id @default(uuid()) @db.Uuid
+  businessId        String                @db.Uuid
+  business          Business              @relation(fields: [businessId], references: [id], onDelete: Restrict)
+  gstin             String                @db.VarChar(15)
+  financialYear     String                @db.VarChar(16)
+  returnPeriod      String                @db.VarChar(16)
+  originalFilename  String
+  storageObjectKey  String?
+  status            ReferenceImportStatus @default(QUEUED)
+  totalDocuments    Int                   @default(0)
+  importedDocuments Int                   @default(0)
+  skippedDocuments  Int                   @default(0)
+  failedDocuments   Int                   @default(0)
+  isActive          Boolean               @default(false)
+  invoices          ReferenceInvoice[]
+  uploadBatches     UploadBatch[]
+  createdAt         DateTime              @default(now())
+  updatedAt         DateTime              @updatedAt
+  startedAt         DateTime?
+  completedAt       DateTime?
+
+  @@index([businessId])
+  @@index([businessId, gstin, financialYear, returnPeriod])
+  @@index([status])
+}
+
+model ReferenceInvoice {
+  id                      String              @id @default(uuid()) @db.Uuid
+  referenceImportId       String              @db.Uuid
+  referenceImport         ReferenceImport     @relation(fields: [referenceImportId], references: [id], onDelete: Cascade)
+  supplierGstin           String              @db.VarChar(15)
+  invoiceNumber           String              @db.VarChar(64)
+  normalizedInvoiceNumber String              @db.VarChar(64)
+  invoiceDate             DateTime            @db.Date
+  taxableValue            Decimal             @db.Decimal(18, 2)
+  igstAmount              Decimal             @db.Decimal(18, 2)
+  cgstAmount              Decimal             @db.Decimal(18, 2)
+  sgstAmount              Decimal             @db.Decimal(18, 2)
+  cessAmount              Decimal             @db.Decimal(18, 2)
+  totalInvoiceValue       Decimal             @db.Decimal(18, 2)
+  reconciliationRows      ReconciliationRow[]
+  createdAt               DateTime            @default(now())
+  updatedAt               DateTime            @updatedAt
+
+  @@unique([referenceImportId, supplierGstin, normalizedInvoiceNumber, invoiceDate])
+  @@index([referenceImportId])
+  @@index([supplierGstin, normalizedInvoiceNumber])
+}
+
+model UploadBatch {
+  id                String              @id @default(uuid()) @db.Uuid
+  businessId        String              @db.Uuid
+  business          Business            @relation(fields: [businessId], references: [id], onDelete: Restrict)
+  referenceImportId String              @db.Uuid
+  referenceImport   ReferenceImport     @relation(fields: [referenceImportId], references: [id], onDelete: Restrict)
+  originalFilename  String
+  storageObjectKey  String?
+  status            UploadBatchStatus   @default(QUEUED)
+  totalRows         Int                 @default(0)
+  processedRows     Int                 @default(0)
+  matchedRows       Int                 @default(0)
+  mismatchedRows    Int                 @default(0)
+  errorRows         Int                 @default(0)
+  fileErrorMessage  String?
+  rows              ReconciliationRow[]
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+  startedAt         DateTime?
+  completedAt       DateTime?
+
+  @@index([businessId])
+  @@index([referenceImportId])
+  @@index([status])
+  @@index([businessId, createdAt])
+}
+
+model ReconciliationRow {
+  id                      String               @id @default(uuid()) @db.Uuid
+  batchId                 String               @db.Uuid
+  batch                   UploadBatch          @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  rowNumber               Int
+  rawData                 Json?
+  invoiceNumber           String?              @db.VarChar(64)
+  normalizedInvoiceNumber String?              @db.VarChar(64)
+  supplierGstin           String?              @db.VarChar(15)
+  invoiceDate             DateTime?            @db.Date
+  taxableValue            Decimal?             @db.Decimal(18, 2)
+  igstAmount              Decimal?             @db.Decimal(18, 2)
+  cgstAmount              Decimal?             @db.Decimal(18, 2)
+  sgstAmount              Decimal?             @db.Decimal(18, 2)
+  cessAmount              Decimal?             @db.Decimal(18, 2)
+  totalInvoiceValue       Decimal?             @db.Decimal(18, 2)
+  processingStatus        RowProcessingStatus  @default(PENDING)
+  reconciliationResult    ReconciliationResult @default(PENDING)
+  errorCode               RowErrorCode?
+  errorMessage            String?
+  matchedReferenceId      String?              @db.Uuid
+  matchedReference        ReferenceInvoice?    @relation(fields: [matchedReferenceId], references: [id], onDelete: SetNull)
+  mismatchCodes           String[]             @default([])
+  mismatchDetails         Json?
+  createdAt               DateTime             @default(now())
+  updatedAt               DateTime             @updatedAt
+  processedAt             DateTime?
+
+  @@unique([batchId, rowNumber])
+  @@index([batchId])
+  @@index([matchedReferenceId])
+  @@index([processingStatus])
+  @@index([reconciliationResult])
+  @@index([supplierGstin, normalizedInvoiceNumber])
+}
