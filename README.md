@@ -238,9 +238,7 @@ SW2627-ClearTax/
 
 ## Getting Started
 
-The project is currently under initial setup.
-
-Complete installation and development instructions will be added once the frontend and backend environments are configured.
+The project is currently under active setup.
 
 ### Clone the Repository
 
@@ -248,6 +246,45 @@ Complete installation and development instructions will be added once the fronte
 git clone <repository-url>
 cd SW2627-ClearTax
 ```
+
+### Install Dependencies
+
+```bash
+npm install
+```
+
+### Configure Environment
+
+Create a local environment file from the committed example:
+
+```bash
+cp .env.example .env
+```
+
+Replace the placeholder values in `.env` with local development values. At minimum, local development requires `DATABASE_URL` so Prisma can connect to PostgreSQL. Use `APP_URL="http://localhost:3000"` for the local Next.js app unless you run it on a different origin.
+
+The `.env.example` file documents the environment-variable contract and contains placeholder values only. Real `.env` files must never be committed because they can contain database credentials, authentication secrets, service-account paths, or other sensitive configuration.
+
+### Environment Variables
+
+| Variable | Purpose | Local | Production | Exposure |
+| --- | --- | --- | --- | --- |
+| `DATABASE_URL` | PostgreSQL connection used by Prisma | Required | Required | Server only |
+| `APP_URL` | Canonical application origin for server-side redirects, callbacks, and links | Required | Required | Server only |
+| `AUTH_SECRET` | Placeholder for the app/session signing secret when authentication is enabled | Planned | Required when auth is enabled | Server only |
+| `GCP_PROJECT_ID` | Google Cloud project identifier for deployed infrastructure | Planned | Required | Server only |
+| `GOOGLE_APPLICATION_CREDENTIALS` | Optional local path for Google Application Default Credentials | Optional | Platform-managed or optional | Server only |
+| `GCP_STORAGE_BUCKET` | Private Cloud Storage bucket for uploaded CSV and GSTR-2B files | Planned | Required when storage is enabled | Server only |
+| `GCP_TASKS_LOCATION` | Google Cloud region for Cloud Tasks | Planned | Required when background tasks are enabled | Server only |
+| `GCP_TASKS_QUEUE` | Cloud Tasks queue for background reconciliation work | Planned | Required when background tasks are enabled | Server only |
+
+No current environment variable is browser-safe. Do not add the `NEXT_PUBLIC_` prefix to database, authentication, GCP, storage, or task-queue values because `NEXT_PUBLIC_*` values are exposed to client-side JavaScript.
+
+### Production Configuration
+
+Production values must be provided by the deployment platform or cloud runtime environment, not committed to Git. Production configuration is expected to include the PostgreSQL/Cloud SQL database connection, application URL, authentication secret, GCP project, private Cloud Storage bucket, and Cloud Tasks queue settings.
+
+Do not commit service-account JSON files, private keys, API tokens, database passwords, or production `.env` files.
 
 ---
 
