@@ -1,6 +1,11 @@
 "use client";
 
-import type { ButtonHTMLAttributes } from "react";
+import {
+  cloneElement,
+  isValidElement,
+  type ButtonHTMLAttributes,
+  type ReactNode,
+} from "react";
 
 type ButtonVariant =
   | "primary"
@@ -13,6 +18,8 @@ type ButtonSize = "sm" | "md" | "lg";
 interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: ButtonVariant;
   size?: ButtonSize;
+  asChild?: boolean;
+  children?: ReactNode;
 }
 
 const variantStyles: Record<ButtonVariant, string> = {
@@ -35,26 +42,35 @@ const sizeStyles: Record<ButtonSize, string> = {
 export default function Button({
   variant = "primary",
   size = "md",
+  asChild = false,
   className = "",
+  children,
   ...props
 }: ButtonProps) {
+  const styles = `
+    inline-flex
+    items-center
+    justify-center
+    gap-2
+    rounded-md
+    font-medium
+    transition-colors
+    disabled:pointer-events-none
+    disabled:opacity-50
+    ${variantStyles[variant]}
+    ${sizeStyles[size]}
+    ${className}
+  `;
+
+  if (asChild && isValidElement(children)) {
+    return cloneElement(children, {
+      className: styles,
+    });
+  }
+
   return (
-    <button
-      className={`
-        inline-flex
-        items-center
-        justify-center
-        gap-2
-        rounded-md
-        font-medium
-        transition-colors
-        disabled:pointer-events-none
-        disabled:opacity-50
-        ${variantStyles[variant]}
-        ${sizeStyles[size]}
-        ${className}
-      `}
-      {...props}
-    />
+    <button className={styles} {...props}>
+      {children}
+    </button>
   );
 }
