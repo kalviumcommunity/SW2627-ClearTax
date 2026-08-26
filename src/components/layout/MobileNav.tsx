@@ -11,13 +11,13 @@ const navigation = [
     icon: "▦",
   },
   {
-    name: "Upload History",
-    href: "/history",
+    name: "Reconciliations",
+    href: "/reconciliations",
     icon: "◷",
   },
   {
-    name: "Reconciliation",
-    href: "/reconciliation",
+    name: "Reference Imports",
+    href: "/reference-imports",
     icon: "⇄",
   },
 ];

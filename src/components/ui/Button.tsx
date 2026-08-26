@@ -1,5 +1,3 @@
-"use client";
-
 import {
   cloneElement,
   isValidElement,
@@ -62,7 +60,10 @@ export default function Button({
     ${className}
   `;
 
-  if (asChild && isValidElement(children)) {
+  if (
+    asChild &&
+    isValidElement<{ className?: string }>(children)
+  ) {
     return cloneElement(children, {
       className: styles,
     });
