@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { connection } from "next/server";
 import PageContainer from "@/components/layout/PageContainer";
 import Card from "@/components/ui/Card";
 import { isUuid } from "@/lib/ids";
@@ -46,6 +47,8 @@ export default async function ReferenceImportPage({
   if (!isUuid(referenceImportId)) {
     notFound();
   }
+
+  await connection();
 
   const prisma = getPrismaClient();
 
