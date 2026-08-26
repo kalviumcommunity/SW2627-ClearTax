@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Sidebar from "@/components/layout/Sidebar";
 import Header from "@/components/layout/Header";
 import MobileNav from "@/components/layout/MobileNav";
-import "./globals.css";
+import "../globals.css";
 
 export const metadata: Metadata = {
   title: "ClearTax Bulk Invoice Reconciliation",
