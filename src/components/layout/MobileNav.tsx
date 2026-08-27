@@ -1,29 +1,9 @@
 "use client";
 
-import Link from "next/link";
-import { usePathname } from "next/navigation";
 import { useState } from "react";
-
-const navigation = [
-  {
-    name: "Dashboard",
-    href: "/",
-    icon: "▦",
-  },
-  {
-    name: "Reconciliations",
-    href: "/reconciliations",
-    icon: "◷",
-  },
-  {
-    name: "Reference Imports",
-    href: "/reference-imports",
-    icon: "⇄",
-  },
-];
+import WorkspaceNavLinks from "@/components/layout/WorkspaceNavLinks";
 
 export default function MobileNav() {
-  const pathname = usePathname();
   const [open, setOpen] = useState(false);
 
   return (
@@ -174,43 +154,7 @@ export default function MobileNav() {
             Workspace
           </p>
 
-          <div className="space-y-1">
-            {navigation.map((item) => {
-              const isActive =
-                pathname === item.href ||
-                (item.href !== "/" &&
-                  pathname.startsWith(item.href));
-
-              return (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  onClick={() => setOpen(false)}
-                  className={`
-                    flex
-                    items-center
-                    gap-3
-                    rounded-md
-                    px-3
-                    py-2.5
-                    text-sm
-                    font-medium
-                    ${
-                      isActive
-                        ? "bg-info-surface text-info-foreground"
-                        : "text-slate-600 hover:bg-surface-muted hover:text-foreground"
-                    }
-                  `}
-                >
-                  <span aria-hidden="true">
-                    {item.icon}
-                  </span>
-
-                  <span>{item.name}</span>
-                </Link>
-              );
-            })}
-          </div>
+          <WorkspaceNavLinks onNavigate={() => setOpen(false)} />
         </nav>
       </aside>
     </>
