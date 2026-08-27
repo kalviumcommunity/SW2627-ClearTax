@@ -1,8 +1,10 @@
+import UploadProgress from "@/components/upload/UploadProgress";
 import Link from "next/link";
 import { connection } from "next/server";
 import PageContainer from "@/components/layout/PageContainer";
 import Card from "@/components/ui/Card";
 import { getPrismaClient } from "@/lib/prisma";
+
 import type {
   ReferenceImportStatus,
   UploadBatchStatus,
@@ -166,6 +168,7 @@ export default async function DashboardPage() {
           View history
         </Link>
       </div>
+      <UploadProgress />
 
       <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {summaryItems.map(([label, value]) => (
