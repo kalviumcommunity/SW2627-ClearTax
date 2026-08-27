@@ -1,29 +1,6 @@
-"use client";
-
-import Link from "next/link";
-import { usePathname } from "next/navigation";
-
-const navigation = [
-  {
-    name: "Dashboard",
-    href: "/",
-    icon: "▦",
-  },
-  {
-    name: "Reconciliations",
-    href: "/reconciliations",
-    icon: "◷",
-  },
-  {
-    name: "Reference Imports",
-    href: "/reference-imports",
-    icon: "⇄",
-  },
-];
+import WorkspaceNavLinks from "@/components/layout/WorkspaceNavLinks";
 
 export default function Sidebar() {
-  const pathname = usePathname();
-
   return (
     <aside
       className="
@@ -68,46 +45,10 @@ export default function Sidebar() {
           Workspace
         </p>
 
-        <div className="space-y-1">
-          {navigation.map((item) => {
-            const isActive =
-              pathname === item.href ||
-              (item.href !== "/" &&
-                pathname.startsWith(item.href));
-
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                className={`
-                  flex
-                  items-center
-                  gap-3
-                  rounded-md
-                  px-3
-                  py-2.5
-                  text-sm
-                  font-medium
-                  transition-colors
-                  ${
-                    isActive
-                      ? "bg-info-surface text-info-foreground"
-                      : "text-slate-600 hover:bg-surface-muted hover:text-foreground"
-                  }
-                `}
-              >
-                <span
-                  className="text-base"
-                  aria-hidden="true"
-                >
-                  {item.icon}
-                </span>
-
-                <span>{item.name}</span>
-              </Link>
-            );
-          })}
-        </div>
+        <WorkspaceNavLinks
+          iconClassName="text-base"
+          linkClassName="transition-colors"
+        />
       </nav>
 
       {/* Footer */}
