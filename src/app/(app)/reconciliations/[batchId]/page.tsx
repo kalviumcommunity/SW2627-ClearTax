@@ -6,7 +6,7 @@ import Card from "@/components/ui/Card";
 import { isUuid } from "@/lib/ids";
 import { getPrismaClient } from "@/lib/prisma";
 import type { UploadBatchStatus } from "@/generated/prisma/client";
-
+import BatchControls from "@/components/batch/BatchControls";
 type ReconciliationBatchPageProps = {
   params: Promise<{
     batchId: string;
@@ -121,6 +121,10 @@ export default async function ReconciliationBatchPage({
           <p className="mt-2 break-all font-mono text-xs text-slate-500">
             {batch.id}
           </p>
+          <BatchControls
+              batchId={batch.id}
+             status={formatStatus(batch.status)}
+          />
         </div>
 
         <span
