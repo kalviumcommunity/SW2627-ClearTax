@@ -6,9 +6,52 @@ import Card from "@/components/ui/Card";
 import { getPrismaClient } from "@/lib/prisma";
 
 import type {
+  Prisma,
   ReferenceImportStatus,
   UploadBatchStatus,
 } from "@/generated/prisma/client";
+
+type RecentBatch = Prisma.UploadBatchGetPayload<{
+  select: {
+    id: true;
+    originalFilename: true;
+    status: true;
+    totalRows: true;
+    matchedRows: true;
+    mismatchedRows: true;
+    errorRows: true;
+    createdAt: true;
+    business: {
+      select: {
+        gstin: true;
+      };
+    };
+    referenceImport: {
+      select: {
+        financialYear: true;
+        returnPeriod: true;
+      };
+    };
+  };
+}>;
+
+type RecentImport = Prisma.ReferenceImportGetPayload<{
+  select: {
+    id: true;
+    originalFilename: true;
+    status: true;
+    totalDocuments: true;
+    importedDocuments: true;
+    createdAt: true;
+    business: {
+      select: {
+        gstin: true;
+      };
+    };
+    financialYear: true;
+    returnPeriod: true;
+  };
+}>;
 
 const uploadStatusStyles: Record<UploadBatchStatus, string> = {
   QUEUED: "bg-surface-muted text-slate-700",
@@ -49,28 +92,32 @@ export default async function DashboardPage() {
 
   const prisma = getPrismaClient();
 
-  const [
-    totalUploads,
-    processingUploads,
-    completedUploads,
-    needsAttentionUploads,
-    recentBatches,
-    recentImports,
-  ] = await Promise.all([
-    prisma.uploadBatch.count(),
-    prisma.uploadBatch.count({
+  let dashboardDataError = false;
+  let totalUploads = 0;
+  let processingUploads = 0;
+  let completedUploads = 0;
+  let needsAttentionUploads = 0;
+  let recentBatches: RecentBatch[] = [];
+  let recentImports: RecentImport[] = [];
+
+  try {
+    totalUploads = await prisma.uploadBatch.count();
+
+    processingUploads = await prisma.uploadBatch.count({
       where: {
         status: {
           in: ["QUEUED", "PROCESSING"],
         },
       },
-    }),
-    prisma.uploadBatch.count({
+    });
+
+    completedUploads = await prisma.uploadBatch.count({
       where: {
         status: "COMPLETED",
       },
-    }),
-    prisma.uploadBatch.count({
+    });
+
+    needsAttentionUploads = await prisma.uploadBatch.count({
       where: {
         OR: [
           {
@@ -90,8 +137,9 @@ export default async function DashboardPage() {
           },
         ],
       },
-    }),
-    prisma.uploadBatch.findMany({
+    });
+
+    recentBatches = await prisma.uploadBatch.findMany({
       orderBy: {
         createdAt: "desc",
       },
@@ -117,8 +165,9 @@ export default async function DashboardPage() {
         },
       },
       take: 5,
-    }),
-    prisma.referenceImport.findMany({
+    });
+
+    recentImports = await prisma.referenceImport.findMany({
       orderBy: {
         createdAt: "desc",
       },
@@ -138,8 +187,10 @@ export default async function DashboardPage() {
         returnPeriod: true,
       },
       take: 5,
-    }),
-  ]);
+    });
+  } catch {
+    dashboardDataError = true;
+  }
 
   const summaryItems = [
     ["Total uploads", totalUploads],
@@ -169,6 +220,19 @@ export default async function DashboardPage() {
         </Link>
       </div>
       <UploadProgress />
+
+      {dashboardDataError ? (
+        <Card className="mt-6 border-warning bg-warning-surface p-5">
+          <p className="text-sm font-medium text-warning-foreground">
+            Dashboard data is temporarily unavailable.
+          </p>
+
+          <p className="mt-1 text-sm text-warning-foreground">
+            The workspace is still available while the database connection
+            recovers.
+          </p>
+        </Card>
+      ) : null}
 
       <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {summaryItems.map(([label, value]) => (

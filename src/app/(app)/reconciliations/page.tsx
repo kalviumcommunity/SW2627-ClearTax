@@ -33,6 +33,8 @@ function formatStatus(value: string) {
 }
 
 export default async function ReconciliationsPage() {
+  // Reconciliation progress is persisted and may change after upload, so this
+  // page must render from the latest database state on each request.
   await connection();
 
   const prisma = getPrismaClient();
