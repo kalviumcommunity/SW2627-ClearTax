@@ -7,6 +7,7 @@ import { isUuid } from "@/lib/ids";
 import { getPrismaClient } from "@/lib/prisma";
 import type { UploadBatchStatus } from "@/generated/prisma/client";
 import BatchControls from "@/components/batch/BatchControls";
+
 type ReconciliationBatchPageProps = {
   params: Promise<{
     batchId: string;
@@ -55,49 +56,66 @@ export default async function ReconciliationBatchPage({
 
   const prisma = getPrismaClient();
 
-  const batch = await prisma.uploadBatch.findUnique({
-    where: {
-      id: batchId,
-    },
-    select: {
-      id: true,
-      originalFilename: true,
-      status: true,
-      totalRows: true,
-      processedRows: true,
-      matchedRows: true,
-      mismatchedRows: true,
-      errorRows: true,
-      fileErrorMessage: true,
-      createdAt: true,
-      updatedAt: true,
-      startedAt: true,
-      completedAt: true,
-      business: {
-        select: {
-          legalName: true,
-          gstin: true,
+  const [batchResult, referenceImport, persistedRowCount] = await Promise.all([
+    prisma.uploadBatch.findUnique({
+      where: {
+        id: batchId,
+      },
+      select: {
+        id: true,
+        originalFilename: true,
+        status: true,
+        totalRows: true,
+        processedRows: true,
+        matchedRows: true,
+        mismatchedRows: true,
+        errorRows: true,
+        fileErrorMessage: true,
+        createdAt: true,
+        updatedAt: true,
+        startedAt: true,
+        completedAt: true,
+        business: {
+          select: {
+            legalName: true,
+            gstin: true,
+          },
         },
       },
-      referenceImport: {
-        select: {
-          id: true,
-          financialYear: true,
-          returnPeriod: true,
-          status: true,
+    }),
+    prisma.referenceImport.findFirst({
+      where: {
+        uploadBatches: {
+          some: {
+            id: batchId,
+          },
         },
       },
-      _count: {
-        select: {
-          rows: true,
-        },
+      select: {
+        id: true,
+        financialYear: true,
+        returnPeriod: true,
+        status: true,
       },
-    },
-  });
+    }),
+    prisma.reconciliationRow.count({
+      where: {
+        batchId,
+      },
+    }),
+  ]);
 
-  if (!batch) {
+  if (!batchResult || !referenceImport) {
     notFound();
   }
+
+  const batch = {
+    ...batchResult,
+    referenceImport,
+    _count: {
+      rows: persistedRowCount,
+    },
+  };
 
   const summaryItems = [
     ["Total rows", batch.totalRows],
@@ -124,8 +142,8 @@ export default async function ReconciliationBatchPage({
             {batch.id}
           </p>
           <BatchControls
-              batchId={batch.id}
-             status={formatStatus(batch.status)}
+            batchId={batch.id}
+            status={formatStatus(batch.status)}
           />
         </div>
 
