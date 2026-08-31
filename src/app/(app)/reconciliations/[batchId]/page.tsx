@@ -49,6 +49,8 @@ export default async function ReconciliationBatchPage({
     notFound();
   }
 
+  // Reconciliation batches may continue processing in the background, so read
+  // persisted counters and status at request time instead of during prerender.
   await connection();
 
   const prisma = getPrismaClient();
