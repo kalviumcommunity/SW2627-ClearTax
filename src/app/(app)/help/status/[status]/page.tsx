@@ -5,6 +5,10 @@ import { notFound } from "next/navigation";
 import PageContainer from "@/components/layout/PageContainer";
 
 import Card from "@/components/ui/Card";
+// This page contains only public, non-sensitive help content.
+// Reconciliation, tax, invoice, and batch data are intentionally
+// excluded so those data-heavy routes remain dynamically rendered.
+export const revalidate = 3600;
 
 const statusDetails = {
   QUEUED: {
