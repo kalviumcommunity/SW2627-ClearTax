@@ -109,16 +109,31 @@ export async function POST(request: Request) {
 
   try {
     const prisma = getPrismaClient();
+    // Resolve business context first because the reference import
+// must belong to the resolved business before creating a batch.
 
-    const referenceImport = await prisma.referenceImport.findFirst({
-      where: {
-        id: referenceImportId,
-        businessId,
-      },
-      select: {
-        id: true,
-      },
-    });
+    const business = await prisma.business.findUnique({
+  where: {
+    id: businessId,
+  },
+  select: {
+    id: true,
+  },
+});
+
+if (!business) {
+  return errorResponse("Business was not found.", 404);
+}
+
+const referenceImport = await prisma.referenceImport.findFirst({
+  where: {
+    id: referenceImportId,
+    businessId: business.id,
+  },
+  select: {
+    id: true,
+  },
+});
 
     if (!referenceImport) {
       return errorResponse("Reference import was not found.", 404);
