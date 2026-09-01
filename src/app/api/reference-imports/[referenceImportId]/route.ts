@@ -1,6 +1,10 @@
-import { errorResponse, successResponse } from "@/lib/api-response";
-import { isUuid } from "@/lib/ids";
+import {
+  errorResponse,
+  successResponse,
+  validationErrorResponse,
+} from "@/lib/api-response";
 import { getPrismaClient } from "@/lib/prisma";
+import { referenceImportRouteParamsSchema } from "@/lib/validation/reconciliation";
 
 type ReferenceImportRouteContext = {
   params: Promise<{
@@ -56,11 +60,15 @@ export async function GET(
   _request: Request,
   { params }: ReferenceImportRouteContext,
 ) {
-  const { referenceImportId } = await params;
+  const validationResult = referenceImportRouteParamsSchema.safeParse(
+    await params,
+  );
 
-  if (!isUuid(referenceImportId)) {
-    return errorResponse("Reference import was not found.", 404);
+  if (!validationResult.success) {
+    return validationErrorResponse(validationResult.error);
   }
+
+  const { referenceImportId } = validationResult.data;
 
   try {
     const prisma = getPrismaClient();
