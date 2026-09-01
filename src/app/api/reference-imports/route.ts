@@ -1,12 +1,11 @@
 import {
   errorResponse,
-  getOptionalString,
-  getRequiredString,
   parseJsonObject,
   successResponse,
+  validationErrorResponse,
 } from "@/lib/api-response";
-import { isUuid } from "@/lib/ids";
 import { getPrismaClient } from "@/lib/prisma";
+import { createReferenceImportSchema } from "@/lib/validation/reconciliation";
 
 export const dynamic = "force-dynamic";
 
@@ -67,50 +66,22 @@ export async function POST(request: Request) {
     return parsedBody.response;
   }
 
-  const businessId = getRequiredString(parsedBody.body, "businessId");
-  const gstin = getRequiredString(parsedBody.body, "gstin");
-  const financialYear = getRequiredString(parsedBody.body, "financialYear");
-  const returnPeriod = getRequiredString(parsedBody.body, "returnPeriod");
-  const originalFilename = getRequiredString(
+  const validationResult = createReferenceImportSchema.safeParse(
     parsedBody.body,
-    "originalFilename",
-  );
-  const storageObjectKey = getOptionalString(
-    parsedBody.body,
-    "storageObjectKey",
   );
 
-  if (
-    !businessId ||
-    !gstin ||
-    !financialYear ||
-    !returnPeriod ||
-    !originalFilename
-  ) {
-    return errorResponse(
-      "businessId, gstin, financialYear, returnPeriod, and originalFilename are required.",
-      400,
-    );
+  if (!validationResult.success) {
+    return validationErrorResponse(validationResult.error);
   }
 
-  if (!isUuid(businessId)) {
-    return errorResponse("businessId must be a valid UUID.", 400);
-  }
-
-  if (storageObjectKey === null) {
-    return errorResponse("storageObjectKey must be a non-empty string.", 400);
-  }
-
-  if (
-    gstin.length > 15 ||
-    financialYear.length > 16 ||
-    returnPeriod.length > 16
-  ) {
-    return errorResponse(
-      "gstin, financialYear, or returnPeriod exceeds the supported length.",
-      400,
-    );
-  }
+  const {
+    businessId,
+    gstin,
+    financialYear,
+    returnPeriod,
+    originalFilename,
+    storageObjectKey,
+  } = validationResult.data;
 
   try {
     const prisma = getPrismaClient();

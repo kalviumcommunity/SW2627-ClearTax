@@ -1,6 +1,10 @@
-import { errorResponse, successResponse } from "@/lib/api-response";
-import { isUuid } from "@/lib/ids";
+import {
+  errorResponse,
+  successResponse,
+  validationErrorResponse,
+} from "@/lib/api-response";
 import { getPrismaClient } from "@/lib/prisma";
+import { batchRouteParamsSchema } from "@/lib/validation/reconciliation";
 
 type BatchRouteContext = {
   params: Promise<{
@@ -46,11 +50,13 @@ const batchSelect = {
 } as const;
 
 export async function GET(_request: Request, { params }: BatchRouteContext) {
-  const { batchId } = await params;
+  const validationResult = batchRouteParamsSchema.safeParse(await params);
 
-  if (!isUuid(batchId)) {
-    return errorResponse("Reconciliation batch was not found.", 404);
+  if (!validationResult.success) {
+    return validationErrorResponse(validationResult.error);
   }
+
+  const { batchId } = validationResult.data;
 
   try {
     const prisma = getPrismaClient();

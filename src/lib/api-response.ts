@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import type { ZodError } from "zod";
 
 type ApiSuccess<T> = {
   success: true;
@@ -8,11 +9,18 @@ type ApiSuccess<T> = {
 type ApiError = {
   success: false;
   error: {
+    code?: string;
     message: string;
+    details?: ValidationErrorDetail[];
   };
 };
 
 export type JsonObject = Record<string, unknown>;
+
+export type ValidationErrorDetail = {
+  field: string;
+  message: string;
+};
 
 export function successResponse<T>(data: T, init?: ResponseInit) {
   return NextResponse.json<ApiSuccess<T>>(
@@ -38,6 +46,29 @@ export function errorResponse(message: string, status: number) {
   );
 }
 
+export function validationErrorResponse(error: ZodError) {
+  return NextResponse.json<ApiError>(
+    {
+      success: false,
+      error: {
+        code: "VALIDATION_ERROR",
+        message: "Invalid request data",
+        details: formatZodIssues(error),
+      },
+    },
+    {
+      status: 400,
+    },
+  );
+}
+
+export function formatZodIssues(error: ZodError): ValidationErrorDetail[] {
+  return error.issues.map((issue) => ({
+    field: formatZodIssuePath(issue.path),
+    message: issue.message,
+  }));
+}
+
 export async function parseJsonObject(request: Request) {
   try {
     const body: unknown = await request.json();
@@ -61,32 +92,8 @@ export async function parseJsonObject(request: Request) {
   }
 }
 
-export function getRequiredString(body: JsonObject, field: string) {
-  const value = body[field];
-
-  if (typeof value !== "string") {
-    return null;
-  }
-
-  const trimmedValue = value.trim();
-
-  return trimmedValue.length > 0 ? trimmedValue : null;
-}
-
-export function getOptionalString(body: JsonObject, field: string) {
-  const value = body[field];
-
-  if (value === undefined || value === null) {
-    return undefined;
-  }
-
-  if (typeof value !== "string") {
-    return null;
-  }
-
-  const trimmedValue = value.trim();
-
-  return trimmedValue.length > 0 ? trimmedValue : null;
+function formatZodIssuePath(path: PropertyKey[]) {
+  return path.length > 0 ? path.map(String).join(".") : "request";
 }
 
 function isJsonObject(value: unknown): value is JsonObject {

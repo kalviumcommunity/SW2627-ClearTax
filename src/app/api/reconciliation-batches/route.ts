@@ -1,12 +1,11 @@
 import {
   errorResponse,
-  getOptionalString,
-  getRequiredString,
   parseJsonObject,
   successResponse,
+  validationErrorResponse,
 } from "@/lib/api-response";
-import { isUuid } from "@/lib/ids";
 import { getPrismaClient } from "@/lib/prisma";
+import { createReconciliationBatchSchema } from "@/lib/validation/reconciliation";
 
 export const dynamic = "force-dynamic";
 
@@ -75,65 +74,44 @@ export async function POST(request: Request) {
     return parsedBody.response;
   }
 
-  const businessId = getRequiredString(parsedBody.body, "businessId");
-  const referenceImportId = getRequiredString(
+  const validationResult = createReconciliationBatchSchema.safeParse(
     parsedBody.body,
-    "referenceImportId",
-  );
-  const originalFilename = getRequiredString(
-    parsedBody.body,
-    "originalFilename",
-  );
-  const storageObjectKey = getOptionalString(
-    parsedBody.body,
-    "storageObjectKey",
   );
 
-  if (!businessId || !referenceImportId || !originalFilename) {
-    return errorResponse(
-      "businessId, referenceImportId, and originalFilename are required.",
-      400,
-    );
+  if (!validationResult.success) {
+    return validationErrorResponse(validationResult.error);
   }
 
-  if (!isUuid(businessId) || !isUuid(referenceImportId)) {
-    return errorResponse(
-      "businessId and referenceImportId must be valid UUIDs.",
-      400,
-    );
-  }
-
-  if (storageObjectKey === null) {
-    return errorResponse("storageObjectKey must be a non-empty string.", 400);
-  }
+  const { businessId, referenceImportId, originalFilename, storageObjectKey } =
+    validationResult.data;
 
   try {
     const prisma = getPrismaClient();
     // Resolve business context first because the reference import
-// must belong to the resolved business before creating a batch.
+    // must belong to the resolved business before creating a batch.
 
     const business = await prisma.business.findUnique({
-  where: {
-    id: businessId,
-  },
-  select: {
-    id: true,
-  },
-});
+      where: {
+        id: businessId,
+      },
+      select: {
+        id: true,
+      },
+    });
 
-if (!business) {
-  return errorResponse("Business was not found.", 404);
-}
+    if (!business) {
+      return errorResponse("Business was not found.", 404);
+    }
 
-const referenceImport = await prisma.referenceImport.findFirst({
-  where: {
-    id: referenceImportId,
-    businessId: business.id,
-  },
-  select: {
-    id: true,
-  },
-});
+    const referenceImport = await prisma.referenceImport.findFirst({
+      where: {
+        id: referenceImportId,
+        businessId: business.id,
+      },
+      select: {
+        id: true,
+      },
+    });
 
     if (!referenceImport) {
       return errorResponse("Reference import was not found.", 404);
