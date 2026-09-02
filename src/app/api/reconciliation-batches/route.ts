@@ -1,5 +1,5 @@
 import {
-  errorResponse,
+  apiError,
   parseJsonObject,
   successResponse,
   validationErrorResponse,
@@ -60,9 +60,10 @@ export async function GET() {
   } catch (error) {
     console.error("Failed to list reconciliation batches", error);
 
-    return errorResponse(
-      "Reconciliation batches are temporarily unavailable.",
+    return apiError(
       500,
+      "INTERNAL_SERVER_ERROR",
+      "An unexpected server error occurred.",
     );
   }
 }
@@ -100,7 +101,11 @@ export async function POST(request: Request) {
     });
 
     if (!business) {
-      return errorResponse("Business was not found.", 404);
+      return apiError(
+        404,
+        "BUSINESS_NOT_FOUND",
+        "The requested business was not found.",
+      );
     }
 
     const referenceImport = await prisma.referenceImport.findFirst({
@@ -114,7 +119,11 @@ export async function POST(request: Request) {
     });
 
     if (!referenceImport) {
-      return errorResponse("Reference import was not found.", 404);
+      return apiError(
+        404,
+        "REFERENCE_IMPORT_NOT_FOUND",
+        "The requested reference import was not found.",
+      );
     }
 
     const batch = await prisma.uploadBatch.create({
@@ -133,6 +142,10 @@ export async function POST(request: Request) {
   } catch (error) {
     console.error("Failed to create reconciliation batch", error);
 
-    return errorResponse("Reconciliation batch could not be created.", 500);
+    return apiError(
+      500,
+      "INTERNAL_SERVER_ERROR",
+      "An unexpected server error occurred.",
+    );
   }
 }

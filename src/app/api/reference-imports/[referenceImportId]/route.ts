@@ -1,5 +1,5 @@
 import {
-  errorResponse,
+  apiError,
   successResponse,
   validationErrorResponse,
 } from "@/lib/api-response";
@@ -81,13 +81,21 @@ export async function GET(
     });
 
     if (!referenceImport) {
-      return errorResponse("Reference import was not found.", 404);
+      return apiError(
+        404,
+        "REFERENCE_IMPORT_NOT_FOUND",
+        "The requested reference import was not found.",
+      );
     }
 
     return successResponse(referenceImport);
   } catch (error) {
     console.error("Failed to retrieve reference import", error);
 
-    return errorResponse("Reference import is temporarily unavailable.", 500);
+    return apiError(
+      500,
+      "INTERNAL_SERVER_ERROR",
+      "An unexpected server error occurred.",
+    );
   }
 }

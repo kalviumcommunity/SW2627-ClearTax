@@ -6,21 +6,17 @@ type ApiSuccess<T> = {
   data: T;
 };
 
-type ApiError = {
-  success: false;
+export type ApiErrorResponse = {
   error: {
-    code?: string;
+    code: string;
     message: string;
-    details?: ValidationErrorDetail[];
+    details?: unknown;
   };
 };
 
 export type JsonObject = Record<string, unknown>;
 
-export type ValidationErrorDetail = {
-  field: string;
-  message: string;
-};
+export type ValidationErrorDetails = Record<string, string[]>;
 
 export function successResponse<T>(data: T, init?: ResponseInit) {
   return NextResponse.json<ApiSuccess<T>>(
@@ -32,41 +28,39 @@ export function successResponse<T>(data: T, init?: ResponseInit) {
   );
 }
 
-export function errorResponse(message: string, status: number) {
-  return NextResponse.json<ApiError>(
-    {
-      success: false,
-      error: {
-        message,
-      },
+export function apiError(
+  status: number,
+  code: string,
+  message: string,
+  details?: unknown,
+) {
+  const body: ApiErrorResponse = {
+    error: {
+      code,
+      message,
+      ...(details !== undefined ? { details } : {}),
     },
-    {
-      status,
-    },
-  );
+  };
+
+  return NextResponse.json<ApiErrorResponse>(body, { status });
 }
 
 export function validationErrorResponse(error: ZodError) {
-  return NextResponse.json<ApiError>(
-    {
-      success: false,
-      error: {
-        code: "VALIDATION_ERROR",
-        message: "Invalid request data",
-        details: formatZodIssues(error),
-      },
-    },
-    {
-      status: 400,
-    },
+  return apiError(
+    400,
+    "VALIDATION_ERROR",
+    "The request contains invalid fields.",
+    formatZodIssues(error),
   );
 }
 
-export function formatZodIssues(error: ZodError): ValidationErrorDetail[] {
-  return error.issues.map((issue) => ({
-    field: formatZodIssuePath(issue.path),
-    message: issue.message,
-  }));
+export function formatZodIssues(error: ZodError): ValidationErrorDetails {
+  return error.issues.reduce<ValidationErrorDetails>((details, issue) => {
+    const field = formatZodIssuePath(issue.path);
+    details[field] = [...(details[field] ?? []), issue.message];
+
+    return details;
+  }, {});
 }
 
 export async function parseJsonObject(request: Request) {
@@ -76,7 +70,11 @@ export async function parseJsonObject(request: Request) {
     if (!isJsonObject(body)) {
       return {
         success: false,
-        response: errorResponse("Request body must be a JSON object.", 400),
+        response: apiError(
+          400,
+          "INVALID_REQUEST",
+          "Request body must be a JSON object.",
+        ),
       } as const;
     }
 
@@ -87,7 +85,11 @@ export async function parseJsonObject(request: Request) {
   } catch {
     return {
       success: false,
-      response: errorResponse("Request body must contain valid JSON.", 400),
+      response: apiError(
+        400,
+        "INVALID_REQUEST",
+        "Request body must contain valid JSON.",
+      ),
     } as const;
   }
 }

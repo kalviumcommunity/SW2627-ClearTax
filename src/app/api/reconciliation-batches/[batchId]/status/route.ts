@@ -1,5 +1,5 @@
 import {
-  errorResponse,
+  apiError,
   successResponse,
   validationErrorResponse,
 } from "@/lib/api-response";
@@ -51,16 +51,21 @@ export async function GET(
     });
 
     if (!batchStatus) {
-      return errorResponse("Reconciliation batch was not found.", 404);
+      return apiError(
+        404,
+        "BATCH_NOT_FOUND",
+        "The requested reconciliation batch was not found.",
+      );
     }
 
     return successResponse(batchStatus);
   } catch (error) {
     console.error("Failed to retrieve reconciliation batch status", error);
 
-    return errorResponse(
-      "Reconciliation batch status is temporarily unavailable.",
+    return apiError(
       500,
+      "INTERNAL_SERVER_ERROR",
+      "An unexpected server error occurred.",
     );
   }
 }
