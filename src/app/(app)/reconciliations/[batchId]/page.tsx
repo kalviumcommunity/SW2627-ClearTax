@@ -1,11 +1,15 @@
 import Link from "next/link";
-import { notFound } from "next/navigation";
-import { connection } from "next/server";
-import PageContainer from "@/components/layout/PageContainer";
-import Card from "@/components/ui/Card";
-import { isUuid } from "@/lib/ids";
 import { getPrismaClient } from "@/lib/prisma";
+import { notFound } from "next/navigation";
+
+import PageContainer from "@/components/layout/PageContainer";
+
+import Card from "@/components/ui/Card";
+
+import { isUuid } from "@/lib/ids";
+
 import type { UploadBatchStatus } from "@/generated/prisma/client";
+
 import BatchControls from "@/components/batch/BatchControls";
 
 type ReconciliationBatchPageProps = {
@@ -52,79 +56,60 @@ export default async function ReconciliationBatchPage({
 
   // Reconciliation batches may continue processing in the background, so read
   // persisted counters and status at request time instead of during prerender.
-  await connection();
 
-  const prisma = getPrismaClient();
+const prisma = getPrismaClient();
 
-  const [batchResult, referenceImport, persistedRowCount] = await Promise.all([
-    prisma.uploadBatch.findUnique({
-      where: {
-        id: batchId,
-      },
+const batch = await prisma.uploadBatch.findUnique({
+  where: {
+    id: batchId,
+  },
+  select: {
+    id: true,
+    originalFilename: true,
+    status: true,
+    totalRows: true,
+    processedRows: true,
+    matchedRows: true,
+    mismatchedRows: true,
+    errorRows: true,
+    fileErrorMessage: true,
+    createdAt: true,
+    updatedAt: true,
+    startedAt: true,
+    completedAt: true,
+    business: {
       select: {
-        id: true,
-        originalFilename: true,
-        status: true,
-        totalRows: true,
-        processedRows: true,
-        matchedRows: true,
-        mismatchedRows: true,
-        errorRows: true,
-        fileErrorMessage: true,
-        createdAt: true,
-        updatedAt: true,
-        startedAt: true,
-        completedAt: true,
-        business: {
-          select: {
-            legalName: true,
-            gstin: true,
-          },
-        },
+        legalName: true,
+        gstin: true,
       },
-    }),
-    prisma.referenceImport.findFirst({
-      where: {
-        uploadBatches: {
-          some: {
-            id: batchId,
-          },
-        },
-      },
+    },
+    referenceImport: {
       select: {
         id: true,
         financialYear: true,
         returnPeriod: true,
         status: true,
       },
-    }),
-    prisma.reconciliationRow.count({
-      where: {
-        batchId,
-      },
-    }),
-  ]);
-
-  if (!batchResult || !referenceImport) {
-    notFound();
-  }
-
-  const batch = {
-    ...batchResult,
-    referenceImport,
-    _count: {
-      rows: persistedRowCount,
     },
-  };
+    _count: {
+      select: {
+        rows: true,
+      },
+    },
+  },
+});
 
-  const summaryItems = [
-    ["Total rows", batch.totalRows],
-    ["Processed", batch.processedRows],
-    ["Matched", batch.matchedRows],
-    ["Mismatched", batch.mismatchedRows],
-    ["Errors", batch.errorRows],
-    ["Persisted rows", batch._count.rows],
-  ];
+if (!batch) {
+  notFound();
+}
+const summaryItems = [
+  ["Total rows", batch.totalRows],
+  ["Processed", batch.processedRows],
+  ["Matched", batch.matchedRows],
+  ["Mismatched", batch.mismatchedRows],
+  ["Errors", batch.errorRows],
+  ["Persisted rows", batch._count.rows],
+];
 
   return (
     <PageContainer>
