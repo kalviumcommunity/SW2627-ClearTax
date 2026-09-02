@@ -6,6 +6,7 @@ import {
 } from "@/lib/api-response";
 import { getPrismaClient } from "@/lib/prisma";
 import { createReconciliationBatchSchema } from "@/lib/validation/reconciliation";
+import { revalidatePath } from "next/cache";
 
 export const dynamic = "force-dynamic";
 
@@ -135,6 +136,11 @@ export async function POST(request: Request) {
       },
       select: batchSelect,
     });
+
+    revalidatePath("/");
+    revalidatePath("/reconciliations");
+    revalidatePath("/reference-imports");
+    revalidatePath(`/reference-imports/${referenceImportId}`);
 
     return successResponse(batch, {
       status: 201,

@@ -6,6 +6,7 @@ import {
 } from "@/lib/api-response";
 import { getPrismaClient } from "@/lib/prisma";
 import { createReferenceImportSchema } from "@/lib/validation/reconciliation";
+import { revalidatePath } from "next/cache";
 
 export const dynamic = "force-dynamic";
 
@@ -118,6 +119,9 @@ export async function POST(request: Request) {
       },
       select: referenceImportSelect,
     });
+
+    revalidatePath("/");
+    revalidatePath("/reference-imports");
 
     return successResponse(referenceImport, {
       status: 201,
