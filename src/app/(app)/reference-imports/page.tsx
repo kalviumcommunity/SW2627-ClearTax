@@ -4,6 +4,7 @@ import PageContainer from "@/components/layout/PageContainer";
 import Card from "@/components/ui/Card";
 import { getPrismaClient } from "@/lib/prisma";
 import type { ReferenceImportStatus } from "@/generated/prisma/client";
+import ReferenceImportSetupForm from "@/components/reference-imports/ReferenceImportSetupForm";
 
 const statusStyles: Record<ReferenceImportStatus, string> = {
   QUEUED: "bg-surface-muted text-slate-700",
@@ -89,6 +90,7 @@ export default async function ReferenceImportsPage() {
           Back to dashboard
         </Link>
       </div>
+      <ReferenceImportSetupForm />
 
       <Card className="mt-6 overflow-hidden">
         {referenceImports.length > 0 ? (
