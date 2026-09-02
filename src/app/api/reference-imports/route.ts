@@ -1,5 +1,5 @@
 import {
-  errorResponse,
+  apiError,
   parseJsonObject,
   successResponse,
   validationErrorResponse,
@@ -55,7 +55,11 @@ export async function GET() {
   } catch (error) {
     console.error("Failed to list reference imports", error);
 
-    return errorResponse("Reference imports are temporarily unavailable.", 500);
+    return apiError(
+      500,
+      "INTERNAL_SERVER_ERROR",
+      "An unexpected server error occurred.",
+    );
   }
 }
 
@@ -96,7 +100,11 @@ export async function POST(request: Request) {
     });
 
     if (!business) {
-      return errorResponse("Business was not found.", 404);
+      return apiError(
+        404,
+        "BUSINESS_NOT_FOUND",
+        "The requested business was not found.",
+      );
     }
 
     const referenceImport = await prisma.referenceImport.create({
@@ -117,6 +125,10 @@ export async function POST(request: Request) {
   } catch (error) {
     console.error("Failed to create reference import", error);
 
-    return errorResponse("Reference import could not be created.", 500);
+    return apiError(
+      500,
+      "INTERNAL_SERVER_ERROR",
+      "An unexpected server error occurred.",
+    );
   }
 }
