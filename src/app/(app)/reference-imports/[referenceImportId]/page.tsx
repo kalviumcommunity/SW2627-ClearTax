@@ -57,9 +57,7 @@ export default async function ReferenceImportPage({
   const referenceImport = await prisma.referenceImport.findFirst({
     where: {
       id: referenceImportId,
-      business: {
-        ownerId: user.id,
-      },
+      businessId: user.businessId,
     },
     select: {
       id: true,

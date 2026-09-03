@@ -41,9 +41,7 @@ export default async function ReferenceImportsPage() {
 
   const referenceImports = await prisma.referenceImport.findMany({
     where: {
-      business: {
-        ownerId: user.id,
-      },
+      businessId: user.businessId,
     },
     orderBy: {
       createdAt: "desc",

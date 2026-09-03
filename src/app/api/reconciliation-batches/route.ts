@@ -6,7 +6,7 @@ import {
 } from "@/lib/api-response";
 import { requireApiUser } from "@/lib/api-auth";
 import { getPrismaClient } from "@/lib/prisma";
-import { createReconciliationBatchSchema } from "@/lib/validation/reconciliation";
+import { createOwnedReconciliationBatchSchema } from "@/lib/validation/reconciliation";
 import { revalidatePath } from "next/cache";
 
 export const dynamic = "force-dynamic";
@@ -58,9 +58,7 @@ export async function GET() {
 
     const batches = await prisma.uploadBatch.findMany({
       where: {
-        business: {
-          ownerId: authResult.user.id,
-        },
+        businessId: authResult.auth.businessId,
       },
       orderBy: {
         createdAt: "desc",
@@ -94,7 +92,7 @@ export async function POST(request: Request) {
     return parsedBody.response;
   }
 
-  const validationResult = createReconciliationBatchSchema.safeParse(
+  const validationResult = createOwnedReconciliationBatchSchema.safeParse(
     parsedBody.body,
   );
 
@@ -102,7 +100,7 @@ export async function POST(request: Request) {
     return validationErrorResponse(validationResult.error);
   }
 
-  const { businessId, referenceImportId, originalFilename, storageObjectKey } =
+  const { referenceImportId, originalFilename, storageObjectKey } =
     validationResult.data;
 
   try {
@@ -112,8 +110,8 @@ export async function POST(request: Request) {
 
     const business = await prisma.business.findFirst({
       where: {
-        id: businessId,
-        ownerId: authResult.user.id,
+        id: authResult.auth.businessId,
+        ownerId: authResult.auth.userId,
       },
       select: {
         id: true,
@@ -132,9 +130,6 @@ export async function POST(request: Request) {
       where: {
         id: referenceImportId,
         businessId: business.id,
-        business: {
-          ownerId: authResult.user.id,
-        },
       },
       select: {
         id: true,
@@ -151,7 +146,7 @@ export async function POST(request: Request) {
 
     const batch = await prisma.uploadBatch.create({
       data: {
-        businessId,
+        businessId: business.id,
         referenceImportId,
         originalFilename,
         ...(storageObjectKey ? { storageObjectKey } : {}),

@@ -6,7 +6,7 @@ import {
 } from "@/lib/api-response";
 import { requireApiUser } from "@/lib/api-auth";
 import { getPrismaClient } from "@/lib/prisma";
-import { createReferenceImportSchema } from "@/lib/validation/reconciliation";
+import { createOwnedReferenceImportSchema } from "@/lib/validation/reconciliation";
 import { revalidatePath } from "next/cache";
 
 export const dynamic = "force-dynamic";
@@ -53,9 +53,7 @@ export async function GET() {
 
     const referenceImports = await prisma.referenceImport.findMany({
       where: {
-        business: {
-          ownerId: authResult.user.id,
-        },
+        businessId: authResult.auth.businessId,
       },
       orderBy: {
         createdAt: "desc",
@@ -89,7 +87,7 @@ export async function POST(request: Request) {
     return parsedBody.response;
   }
 
-  const validationResult = createReferenceImportSchema.safeParse(
+  const validationResult = createOwnedReferenceImportSchema.safeParse(
     parsedBody.body,
   );
 
@@ -98,7 +96,6 @@ export async function POST(request: Request) {
   }
 
   const {
-    businessId,
     gstin,
     financialYear,
     returnPeriod,
@@ -111,8 +108,8 @@ export async function POST(request: Request) {
 
     const business = await prisma.business.findFirst({
       where: {
-        id: businessId,
-        ownerId: authResult.user.id,
+        id: authResult.auth.businessId,
+        ownerId: authResult.auth.userId,
       },
       select: {
         id: true,
@@ -129,7 +126,7 @@ export async function POST(request: Request) {
 
     const referenceImport = await prisma.referenceImport.create({
       data: {
-        businessId,
+        businessId: business.id,
         gstin,
         financialYear,
         returnPeriod,

@@ -1,5 +1,5 @@
 import type { AuthenticatedUser } from "@/lib/auth";
-import { signOut } from "@/app/(auth)/login/actions";
+import SignOutButton from "@/components/auth/SignOutButton";
 
 interface HeaderProps {
   title?: string;
@@ -60,14 +60,7 @@ export default function Header({
           {userInitial}
         </div>
 
-        <form action={signOut}>
-          <button
-            type="submit"
-            className="inline-flex h-9 items-center justify-center rounded-md border border-border bg-surface px-3 text-sm font-medium text-foreground transition-colors hover:bg-surface-muted"
-          >
-            Sign out
-          </button>
-        </form>
+        <SignOutButton />
       </div>
     </header>
   );

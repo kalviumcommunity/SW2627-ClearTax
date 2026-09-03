@@ -28,7 +28,6 @@ export default function ReferenceImportSetupForm() {
 
     try {
       const result = await createReconciliationSetup({
-        businessId,
         gstin,
         financialYear,
         returnPeriod,
@@ -78,26 +77,6 @@ export default function ReferenceImportSetupForm() {
         onSubmit={handleSubmit}
         className="mt-5 grid gap-4 sm:grid-cols-2"
       >
-        {/* Business ID */}
-        <div>
-          <label className="text-sm font-medium text-foreground">
-            Business ID
-          </label>
-
-          <input
-            value={businessId}
-            onChange={(event) => setBusinessId(event.target.value)}
-            required
-            className="mt-1 h-10 w-full rounded-md border border-border bg-surface px-3 text-sm"
-          />
-
-          {fieldErrors.businessId?.[0] ? (
-            <p className="mt-1 text-sm text-error-foreground">
-              {fieldErrors.businessId[0]}
-            </p>
-          ) : null}
-        </div>
-
         {/* GSTIN */}
         <div>
           <label className="text-sm font-medium text-foreground">

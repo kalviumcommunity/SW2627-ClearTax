@@ -53,9 +53,7 @@ export async function GET(
     const batchStatus = await prisma.uploadBatch.findFirst({
       where: {
         id: batchId,
-        business: {
-          ownerId: authResult.user.id,
-        },
+        businessId: authResult.auth.businessId,
       },
       select: batchStatusSelect,
     });

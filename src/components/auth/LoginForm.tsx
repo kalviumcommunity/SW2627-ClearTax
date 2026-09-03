@@ -1,27 +1,55 @@
 "use client";
 
-import { useActionState } from "react";
-import {
-  signInWithDemoCredentials,
-  type LoginActionState,
-} from "@/app/(auth)/login/actions";
-
-const initialState: LoginActionState = {};
+import { signIn } from "next-auth/react";
+import { useRouter } from "next/navigation";
+import { useState, type FormEvent } from "react";
 
 type LoginFormProps = {
   nextPath: string;
 };
 
 export default function LoginForm({ nextPath }: LoginFormProps) {
-  const [state, action, pending] = useActionState(
-    signInWithDemoCredentials,
-    initialState,
-  );
+  const router = useRouter();
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string[]>>({});
+  const [message, setMessage] = useState("");
+  const [pending, setPending] = useState(false);
+
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    const formData = new FormData(event.currentTarget);
+
+    setFieldErrors({});
+    setMessage("");
+    setPending(true);
+
+    try {
+      const result = await signIn("credentials", {
+        redirect: false,
+        email: String(formData.get("email") ?? ""),
+        password: String(formData.get("password") ?? ""),
+        callbackUrl: nextPath,
+      });
+
+      if (!result?.ok) {
+        setMessage("Invalid email or password.");
+        return;
+      }
+
+      router.push(result.url ?? nextPath);
+      router.refresh();
+    } catch {
+      setMessage("Unable to sign in right now. Please try again.");
+    } finally {
+      setPending(false);
+    }
+  }
 
   return (
-    <form action={action} className="mt-8 rounded-lg border border-border bg-surface p-5 shadow-card">
-      <input type="hidden" name="next" value={nextPath} />
-
+    <form
+      onSubmit={handleSubmit}
+      className="mt-8 rounded-lg border border-border bg-surface p-5 shadow-card"
+    >
       <div>
         <label
           htmlFor="email"
@@ -35,12 +63,12 @@ export default function LoginForm({ nextPath }: LoginFormProps) {
           type="email"
           autoComplete="email"
           required
-          aria-describedby={state.errors?.email ? "email-error" : undefined}
+          aria-describedby={fieldErrors.email ? "email-error" : undefined}
           className="mt-1 h-10 w-full rounded-md border border-border bg-surface px-3 text-sm text-foreground"
         />
-        {state.errors?.email ? (
+        {fieldErrors.email ? (
           <p id="email-error" className="mt-1 text-sm text-error-foreground">
-            {state.errors.email[0]}
+            {fieldErrors.email[0]}
           </p>
         ) : null}
       </div>
@@ -59,19 +87,19 @@ export default function LoginForm({ nextPath }: LoginFormProps) {
           autoComplete="current-password"
           required
           aria-describedby={
-            state.errors?.password ? "password-error" : undefined
+            fieldErrors.password ? "password-error" : undefined
           }
           className="mt-1 h-10 w-full rounded-md border border-border bg-surface px-3 text-sm text-foreground"
         />
-        {state.errors?.password ? (
+        {fieldErrors.password ? (
           <p id="password-error" className="mt-1 text-sm text-error-foreground">
-            {state.errors.password[0]}
+            {fieldErrors.password[0]}
           </p>
         ) : null}
       </div>
 
-      {state.message ? (
-        <p className="mt-4 text-sm text-error-foreground">{state.message}</p>
+      {message ? (
+        <p className="mt-4 text-sm text-error-foreground">{message}</p>
       ) : null}
 
       <button
