@@ -2,6 +2,7 @@ import Link from "next/link";
 import { connection } from "next/server";
 import PageContainer from "@/components/layout/PageContainer";
 import Card from "@/components/ui/Card";
+import { requireCurrentUser } from "@/lib/auth";
 import { getPrismaClient } from "@/lib/prisma";
 import type { UploadBatchStatus } from "@/generated/prisma/client";
 
@@ -37,9 +38,15 @@ export default async function ReconciliationsPage() {
   // page must render from the latest database state on each request.
   await connection();
 
+  const user = await requireCurrentUser();
   const prisma = getPrismaClient();
 
   const batches = await prisma.uploadBatch.findMany({
+    where: {
+      business: {
+        ownerId: user.id,
+      },
+    },
     orderBy: {
       createdAt: "desc",
     },

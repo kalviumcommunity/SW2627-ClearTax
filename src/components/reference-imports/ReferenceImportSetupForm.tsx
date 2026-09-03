@@ -4,7 +4,6 @@ import { useState } from "react";
 import { createReconciliationSetup } from "@/app/(app)/actions/reconciliation";
 
 export default function ReferenceImportSetupForm() {
-  const [businessId, setBusinessId] = useState("");
   const [gstin, setGstin] = useState("");
   const [financialYear, setFinancialYear] = useState("");
   const [returnPeriod, setReturnPeriod] = useState("");
@@ -21,7 +20,6 @@ export default function ReferenceImportSetupForm() {
 
     try {
       await createReconciliationSetup({
-        businessId,
         gstin,
         financialYear,
         returnPeriod,
@@ -31,7 +29,6 @@ export default function ReferenceImportSetupForm() {
 
       setMessage("Reconciliation setup created successfully.");
 
-      setBusinessId("");
       setGstin("");
       setFinancialYear("");
       setReturnPeriod("");
@@ -55,22 +52,10 @@ export default function ReferenceImportSetupForm() {
       </h2>
 
       <p className="mt-1 text-sm text-slate-500">
-        Create reconciliation metadata without processing the uploaded file.
+        Create reconciliation metadata for your demo business.
       </p>
 
       <form onSubmit={handleSubmit} className="mt-5 grid gap-4 sm:grid-cols-2">
-        <div>
-          <label className="text-sm font-medium text-foreground">
-            Business ID
-          </label>
-          <input
-            value={businessId}
-            onChange={(event) => setBusinessId(event.target.value)}
-            required
-            className="mt-1 h-10 w-full rounded-md border border-border bg-surface px-3 text-sm"
-          />
-        </div>
-
         <div>
           <label className="text-sm font-medium text-foreground">
             GSTIN

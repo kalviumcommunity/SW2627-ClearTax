@@ -1,15 +1,11 @@
 import Link from "next/link";
-import { getPrismaClient } from "@/lib/prisma";
 import { notFound } from "next/navigation";
-
+import { requireCurrentUser } from "@/lib/auth";
+import { getPrismaClient } from "@/lib/prisma";
 import PageContainer from "@/components/layout/PageContainer";
-
 import Card from "@/components/ui/Card";
-
 import { isUuid } from "@/lib/ids";
-
 import type { UploadBatchStatus } from "@/generated/prisma/client";
-
 import BatchControls from "@/components/batch/BatchControls";
 
 type ReconciliationBatchPageProps = {
@@ -57,59 +53,64 @@ export default async function ReconciliationBatchPage({
   // Reconciliation batches may continue processing in the background, so read
   // persisted counters and status at request time instead of during prerender.
 
-const prisma = getPrismaClient();
+  const user = await requireCurrentUser();
+  const prisma = getPrismaClient();
 
-const batch = await prisma.uploadBatch.findUnique({
-  where: {
-    id: batchId,
-  },
-  select: {
-    id: true,
-    originalFilename: true,
-    status: true,
-    totalRows: true,
-    processedRows: true,
-    matchedRows: true,
-    mismatchedRows: true,
-    errorRows: true,
-    fileErrorMessage: true,
-    createdAt: true,
-    updatedAt: true,
-    startedAt: true,
-    completedAt: true,
-    business: {
-      select: {
-        legalName: true,
-        gstin: true,
+  const batch = await prisma.uploadBatch.findFirst({
+    where: {
+      id: batchId,
+      business: {
+        ownerId: user.id,
       },
     },
-    referenceImport: {
-      select: {
-        id: true,
-        financialYear: true,
-        returnPeriod: true,
-        status: true,
+    select: {
+      id: true,
+      originalFilename: true,
+      status: true,
+      totalRows: true,
+      processedRows: true,
+      matchedRows: true,
+      mismatchedRows: true,
+      errorRows: true,
+      fileErrorMessage: true,
+      createdAt: true,
+      updatedAt: true,
+      startedAt: true,
+      completedAt: true,
+      business: {
+        select: {
+          legalName: true,
+          gstin: true,
+        },
+      },
+      referenceImport: {
+        select: {
+          id: true,
+          financialYear: true,
+          returnPeriod: true,
+          status: true,
+        },
+      },
+      _count: {
+        select: {
+          rows: true,
+        },
       },
     },
-    _count: {
-      select: {
-        rows: true,
-      },
-    },
-  },
-});
+  });
 
-if (!batch) {
-  notFound();
-}
-const summaryItems = [
-  ["Total rows", batch.totalRows],
-  ["Processed", batch.processedRows],
-  ["Matched", batch.matchedRows],
-  ["Mismatched", batch.mismatchedRows],
-  ["Errors", batch.errorRows],
-  ["Persisted rows", batch._count.rows],
-];
+  if (!batch) {
+    notFound();
+  }
+
+  const summaryItems = [
+    ["Total rows", batch.totalRows],
+    ["Processed", batch.processedRows],
+    ["Matched", batch.matchedRows],
+    ["Mismatched", batch.mismatchedRows],
+    ["Errors", batch.errorRows],
+    ["Persisted rows", batch._count.rows],
+  ];
 
   return (
     <PageContainer>
