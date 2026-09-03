@@ -1,7 +1,9 @@
 "use server";
+
 import { revalidatePath } from "next/cache";
+
 import { getPrismaClient } from "@/lib/prisma";
-import { isUuid } from "@/lib/ids";
+import { createReferenceImportSchema } from "@/lib/validation/reconciliation";
 
 type CreateReconciliationSetupInput = {
   businessId: string;
@@ -15,6 +17,16 @@ type CreateReconciliationSetupInput = {
 export async function createReconciliationSetup(
   input: CreateReconciliationSetupInput,
 ) {
+  const validation = createReferenceImportSchema.safeParse(input);
+
+  if (!validation.success) {
+    return {
+      success: false as const,
+      fieldErrors: validation.error.flatten().fieldErrors,
+      formError: "Please fix the highlighted fields.",
+    };
+  }
+
   const {
     businessId,
     gstin,
@@ -22,11 +34,7 @@ export async function createReconciliationSetup(
     returnPeriod,
     originalFilename,
     storageObjectKey,
-  } = input;
-
-  if (!isUuid(businessId)) {
-    throw new Error("Invalid business ID.");
-  }
+  } = validation.data;
 
   const prisma = getPrismaClient();
 
@@ -40,7 +48,13 @@ export async function createReconciliationSetup(
   });
 
   if (!business) {
-    throw new Error("Business was not found.");
+    return {
+      success: false as const,
+      fieldErrors: {
+        businessId: ["Business was not found."],
+      },
+      formError: "Please fix the highlighted fields.",
+    };
   }
 
   const referenceImport = await prisma.referenceImport.create({
@@ -52,10 +66,12 @@ export async function createReconciliationSetup(
       originalFilename,
       ...(storageObjectKey ? { storageObjectKey } : {}),
     },
-    
   });
 
-revalidatePath("/reference-imports");
+  revalidatePath("/reference-imports");
 
-  return referenceImport;
+  return {
+    success: true as const,
+    referenceImport,
+  };
 }
