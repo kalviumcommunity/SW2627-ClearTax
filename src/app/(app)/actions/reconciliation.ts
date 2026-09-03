@@ -1,18 +1,23 @@
 "use server";
+
 import { revalidatePath } from "next/cache";
-import { getPrimaryBusiness, requireCurrentUser } from "@/lib/auth";
+
 import { getPrismaClient } from "@/lib/prisma";
-import { createOwnedReferenceImportSchema } from "@/lib/validation/reconciliation";
+import { createReferenceImportSchema } from "@/lib/validation/reconciliation";
 
 type CreateReconciliationSetupInput = unknown;
 
 export async function createReconciliationSetup(
   input: CreateReconciliationSetupInput,
 ) {
-  const validationResult = createOwnedReferenceImportSchema.safeParse(input);
+  const validation = createReferenceImportSchema.safeParse(input);
 
-  if (!validationResult.success) {
-    throw new Error("The reconciliation setup contains invalid fields.");
+  if (!validation.success) {
+    return {
+      success: false as const,
+      fieldErrors: validation.error.flatten().fieldErrors,
+      formError: "Please fix the highlighted fields.",
+    };
   }
 
   const {
@@ -21,11 +26,28 @@ export async function createReconciliationSetup(
     returnPeriod,
     originalFilename,
     storageObjectKey,
-  } = validationResult.data;
-  const user = await requireCurrentUser();
-  const business = getPrimaryBusiness(user);
+  } = validation.data;
 
   const prisma = getPrismaClient();
+
+  const business = await prisma.business.findUnique({
+    where: {
+      id: businessId,
+    },
+    select: {
+      id: true,
+    },
+  });
+
+  if (!business) {
+    return {
+      success: false as const,
+      fieldErrors: {
+        businessId: ["Business was not found."],
+      },
+      formError: "Please fix the highlighted fields.",
+    };
+  }
 
   const referenceImport = await prisma.referenceImport.create({
     data: {
@@ -36,18 +58,12 @@ export async function createReconciliationSetup(
       originalFilename,
       ...(storageObjectKey ? { storageObjectKey } : {}),
     },
-    select: {
-      id: true,
-      originalFilename: true,
-      status: true,
-      gstin: true,
-      financialYear: true,
-      returnPeriod: true,
-      createdAt: true,
-    },
   });
 
   revalidatePath("/reference-imports");
 
-  return referenceImport;
+  return {
+    success: true as const,
+    referenceImport,
+  };
 }
