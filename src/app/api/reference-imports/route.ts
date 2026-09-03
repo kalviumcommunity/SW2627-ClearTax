@@ -4,6 +4,7 @@ import {
   successResponse,
   validationErrorResponse,
 } from "@/lib/api-response";
+import { requireApiUser } from "@/lib/api-auth";
 import { getPrismaClient } from "@/lib/prisma";
 import { createReferenceImportSchema } from "@/lib/validation/reconciliation";
 import { revalidatePath } from "next/cache";
@@ -41,10 +42,21 @@ const referenceImportSelect = {
 } as const;
 
 export async function GET() {
+  const authResult = await requireApiUser();
+
+  if (!authResult.success) {
+    return authResult.response;
+  }
+
   try {
     const prisma = getPrismaClient();
 
     const referenceImports = await prisma.referenceImport.findMany({
+      where: {
+        business: {
+          ownerId: authResult.user.id,
+        },
+      },
       orderBy: {
         createdAt: "desc",
       },
@@ -65,6 +77,12 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
+  const authResult = await requireApiUser();
+
+  if (!authResult.success) {
+    return authResult.response;
+  }
+
   const parsedBody = await parseJsonObject(request);
 
   if (!parsedBody.success) {
@@ -91,9 +109,10 @@ export async function POST(request: Request) {
   try {
     const prisma = getPrismaClient();
 
-    const business = await prisma.business.findUnique({
+    const business = await prisma.business.findFirst({
       where: {
         id: businessId,
+        ownerId: authResult.user.id,
       },
       select: {
         id: true,

@@ -3,6 +3,7 @@ import {
   successResponse,
   validationErrorResponse,
 } from "@/lib/api-response";
+import { requireApiUser } from "@/lib/api-auth";
 import { getPrismaClient } from "@/lib/prisma";
 import { batchRouteParamsSchema } from "@/lib/validation/reconciliation";
 
@@ -32,6 +33,12 @@ export async function GET(
   _request: Request,
   { params }: BatchStatusRouteContext,
 ) {
+  const authResult = await requireApiUser();
+
+  if (!authResult.success) {
+    return authResult.response;
+  }
+
   const validationResult = batchRouteParamsSchema.safeParse(await params);
 
   if (!validationResult.success) {
@@ -43,9 +50,12 @@ export async function GET(
   try {
     const prisma = getPrismaClient();
 
-    const batchStatus = await prisma.uploadBatch.findUnique({
+    const batchStatus = await prisma.uploadBatch.findFirst({
       where: {
         id: batchId,
+        business: {
+          ownerId: authResult.user.id,
+        },
       },
       select: batchStatusSelect,
     });

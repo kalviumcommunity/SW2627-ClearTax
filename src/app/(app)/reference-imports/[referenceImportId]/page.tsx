@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { connection } from "next/server";
 import PageContainer from "@/components/layout/PageContainer";
 import Card from "@/components/ui/Card";
+import { requireCurrentUser } from "@/lib/auth";
 import { isUuid } from "@/lib/ids";
 import { getPrismaClient } from "@/lib/prisma";
 import type { ReferenceImportStatus } from "@/generated/prisma/client";
@@ -50,11 +51,15 @@ export default async function ReferenceImportPage({
 
   await connection();
 
+  const user = await requireCurrentUser();
   const prisma = getPrismaClient();
 
-  const referenceImport = await prisma.referenceImport.findUnique({
+  const referenceImport = await prisma.referenceImport.findFirst({
     where: {
       id: referenceImportId,
+      business: {
+        ownerId: user.id,
+      },
     },
     select: {
       id: true,

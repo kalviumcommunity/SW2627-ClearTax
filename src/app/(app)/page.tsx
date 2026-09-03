@@ -3,6 +3,7 @@ import Link from "next/link";
 import { connection } from "next/server";
 import PageContainer from "@/components/layout/PageContainer";
 import Card from "@/components/ui/Card";
+import { requireCurrentUser } from "@/lib/auth";
 import { getPrismaClient } from "@/lib/prisma";
 
 import type {
@@ -90,6 +91,7 @@ function formatStatus(value: string) {
 export default async function DashboardPage() {
   await connection();
 
+  const user = await requireCurrentUser();
   const prisma = getPrismaClient();
 
   let dashboardDataError = false;
@@ -101,10 +103,19 @@ export default async function DashboardPage() {
   let recentImports: RecentImport[] = [];
 
   try {
-    totalUploads = await prisma.uploadBatch.count();
+    totalUploads = await prisma.uploadBatch.count({
+      where: {
+        business: {
+          ownerId: user.id,
+        },
+      },
+    });
 
     processingUploads = await prisma.uploadBatch.count({
       where: {
+        business: {
+          ownerId: user.id,
+        },
         status: {
           in: ["QUEUED", "PROCESSING"],
         },
@@ -113,12 +124,18 @@ export default async function DashboardPage() {
 
     completedUploads = await prisma.uploadBatch.count({
       where: {
+        business: {
+          ownerId: user.id,
+        },
         status: "COMPLETED",
       },
     });
 
     needsAttentionUploads = await prisma.uploadBatch.count({
       where: {
+        business: {
+          ownerId: user.id,
+        },
         OR: [
           {
             status: {
@@ -140,6 +157,11 @@ export default async function DashboardPage() {
     });
 
     recentBatches = await prisma.uploadBatch.findMany({
+      where: {
+        business: {
+          ownerId: user.id,
+        },
+      },
       orderBy: {
         createdAt: "desc",
       },
@@ -168,6 +190,11 @@ export default async function DashboardPage() {
     });
 
     recentImports = await prisma.referenceImport.findMany({
+      where: {
+        business: {
+          ownerId: user.id,
+        },
+      },
       orderBy: {
         createdAt: "desc",
       },

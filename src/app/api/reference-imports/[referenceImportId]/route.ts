@@ -3,6 +3,7 @@ import {
   successResponse,
   validationErrorResponse,
 } from "@/lib/api-response";
+import { requireApiUser } from "@/lib/api-auth";
 import { getPrismaClient } from "@/lib/prisma";
 import { referenceImportRouteParamsSchema } from "@/lib/validation/reconciliation";
 
@@ -60,6 +61,12 @@ export async function GET(
   _request: Request,
   { params }: ReferenceImportRouteContext,
 ) {
+  const authResult = await requireApiUser();
+
+  if (!authResult.success) {
+    return authResult.response;
+  }
+
   const validationResult = referenceImportRouteParamsSchema.safeParse(
     await params,
   );
@@ -73,9 +80,12 @@ export async function GET(
   try {
     const prisma = getPrismaClient();
 
-    const referenceImport = await prisma.referenceImport.findUnique({
+    const referenceImport = await prisma.referenceImport.findFirst({
       where: {
         id: referenceImportId,
+        business: {
+          ownerId: authResult.user.id,
+        },
       },
       select: referenceImportSelect,
     });

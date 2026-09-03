@@ -5,14 +5,7 @@ import { revalidatePath } from "next/cache";
 import { getPrismaClient } from "@/lib/prisma";
 import { createReferenceImportSchema } from "@/lib/validation/reconciliation";
 
-type CreateReconciliationSetupInput = {
-  businessId: string;
-  gstin: string;
-  financialYear: string;
-  returnPeriod: string;
-  originalFilename: string;
-  storageObjectKey?: string;
-};
+type CreateReconciliationSetupInput = unknown;
 
 export async function createReconciliationSetup(
   input: CreateReconciliationSetupInput,
@@ -28,7 +21,6 @@ export async function createReconciliationSetup(
   }
 
   const {
-    businessId,
     gstin,
     financialYear,
     returnPeriod,
@@ -59,7 +51,7 @@ export async function createReconciliationSetup(
 
   const referenceImport = await prisma.referenceImport.create({
     data: {
-      businessId,
+      businessId: business.id,
       gstin,
       financialYear,
       returnPeriod,

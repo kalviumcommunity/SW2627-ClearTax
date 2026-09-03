@@ -7,7 +7,6 @@ import Card from "@/components/ui/Card";
 import { createReconciliationSetup } from "@/app/(app)/actions/reconciliation";
 
 export default function ReferenceImportSetupForm() {
-  const [businessId, setBusinessId] = useState("");
   const [gstin, setGstin] = useState("");
   const [financialYear, setFinancialYear] = useState("");
   const [returnPeriod, setReturnPeriod] = useState("");
@@ -49,7 +48,6 @@ export default function ReferenceImportSetupForm() {
 
       setMessage("Reconciliation setup created successfully.");
 
-      setBusinessId("");
       setGstin("");
       setFinancialYear("");
       setReturnPeriod("");
@@ -73,7 +71,7 @@ export default function ReferenceImportSetupForm() {
       </h2>
 
       <p className="mt-1 text-sm text-slate-500">
-        Create reconciliation metadata without processing the uploaded file.
+        Create reconciliation metadata for your demo business.
       </p>
 
       <form

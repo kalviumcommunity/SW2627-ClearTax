@@ -3,7 +3,11 @@
 import { useState } from "react";
 import WorkspaceNavLinks from "@/components/layout/WorkspaceNavLinks";
 
-export default function MobileNav() {
+type MobileNavProps = {
+  userInitial: string;
+};
+
+export default function MobileNav({ userInitial }: MobileNavProps) {
   const [open, setOpen] = useState(false);
 
   return (
@@ -65,7 +69,7 @@ export default function MobileNav() {
             text-primary-foreground
           "
         >
-          E
+          {userInitial}
         </div>
       </div>
 

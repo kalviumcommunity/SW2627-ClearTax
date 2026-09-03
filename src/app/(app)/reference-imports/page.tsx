@@ -2,6 +2,7 @@ import Link from "next/link";
 import { connection } from "next/server";
 import PageContainer from "@/components/layout/PageContainer";
 import Card from "@/components/ui/Card";
+import { requireCurrentUser } from "@/lib/auth";
 import { getPrismaClient } from "@/lib/prisma";
 import type { ReferenceImportStatus } from "@/generated/prisma/client";
 import ReferenceImportSetupForm from "@/components/reference-imports/ReferenceImportSetupForm";
@@ -35,9 +36,15 @@ function formatStatus(value: string) {
 export default async function ReferenceImportsPage() {
   await connection();
 
+  const user = await requireCurrentUser();
   const prisma = getPrismaClient();
 
   const referenceImports = await prisma.referenceImport.findMany({
+    where: {
+      business: {
+        ownerId: user.id,
+      },
+    },
     orderBy: {
       createdAt: "desc",
     },
