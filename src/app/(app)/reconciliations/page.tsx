@@ -43,9 +43,7 @@ export default async function ReconciliationsPage() {
 
   const batches = await prisma.uploadBatch.findMany({
     where: {
-      business: {
-        ownerId: user.id,
-      },
+      businessId: user.businessId,
     },
     orderBy: {
       createdAt: "desc",

@@ -2,15 +2,16 @@
 
 import { revalidatePath } from "next/cache";
 
+import { requireAuthContext } from "@/lib/auth";
 import { getPrismaClient } from "@/lib/prisma";
-import { createReferenceImportSchema } from "@/lib/validation/reconciliation";
+import { createOwnedReferenceImportSchema } from "@/lib/validation/reconciliation";
 
 type CreateReconciliationSetupInput = unknown;
 
 export async function createReconciliationSetup(
   input: CreateReconciliationSetupInput,
 ) {
-  const validation = createReferenceImportSchema.safeParse(input);
+  const validation = createOwnedReferenceImportSchema.safeParse(input);
 
   if (!validation.success) {
     return {
@@ -29,10 +30,12 @@ export async function createReconciliationSetup(
   } = validation.data;
 
   const prisma = getPrismaClient();
+  const auth = await requireAuthContext();
 
-  const business = await prisma.business.findUnique({
+  const business = await prisma.business.findFirst({
     where: {
-      id: businessId,
+      id: auth.businessId,
+      ownerId: auth.userId,
     },
     select: {
       id: true,
@@ -43,7 +46,7 @@ export async function createReconciliationSetup(
     return {
       success: false as const,
       fieldErrors: {
-        businessId: ["Business was not found."],
+        request: ["Business context is unavailable."],
       },
       formError: "Please fix the highlighted fields.",
     };

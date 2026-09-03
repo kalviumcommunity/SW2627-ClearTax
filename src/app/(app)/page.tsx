@@ -105,17 +105,13 @@ export default async function DashboardPage() {
   try {
     totalUploads = await prisma.uploadBatch.count({
       where: {
-        business: {
-          ownerId: user.id,
-        },
+        businessId: user.businessId,
       },
     });
 
     processingUploads = await prisma.uploadBatch.count({
       where: {
-        business: {
-          ownerId: user.id,
-        },
+        businessId: user.businessId,
         status: {
           in: ["QUEUED", "PROCESSING"],
         },
@@ -124,18 +120,14 @@ export default async function DashboardPage() {
 
     completedUploads = await prisma.uploadBatch.count({
       where: {
-        business: {
-          ownerId: user.id,
-        },
+        businessId: user.businessId,
         status: "COMPLETED",
       },
     });
 
     needsAttentionUploads = await prisma.uploadBatch.count({
       where: {
-        business: {
-          ownerId: user.id,
-        },
+        businessId: user.businessId,
         OR: [
           {
             status: {
@@ -158,9 +150,7 @@ export default async function DashboardPage() {
 
     recentBatches = await prisma.uploadBatch.findMany({
       where: {
-        business: {
-          ownerId: user.id,
-        },
+        businessId: user.businessId,
       },
       orderBy: {
         createdAt: "desc",
@@ -191,9 +181,7 @@ export default async function DashboardPage() {
 
     recentImports = await prisma.referenceImport.findMany({
       where: {
-        business: {
-          ownerId: user.id,
-        },
+        businessId: user.businessId,
       },
       orderBy: {
         createdAt: "desc",

@@ -83,9 +83,7 @@ export async function GET(
     const referenceImport = await prisma.referenceImport.findFirst({
       where: {
         id: referenceImportId,
-        business: {
-          ownerId: authResult.user.id,
-        },
+        businessId: authResult.auth.businessId,
       },
       select: referenceImportSelect,
     });

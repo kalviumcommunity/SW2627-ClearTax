@@ -71,9 +71,7 @@ export async function GET(_request: Request, { params }: BatchRouteContext) {
     const batch = await prisma.uploadBatch.findFirst({
       where: {
         id: batchId,
-        business: {
-          ownerId: authResult.user.id,
-        },
+        businessId: authResult.auth.businessId,
       },
       select: batchSelect,
     });

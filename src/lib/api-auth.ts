@@ -13,6 +13,12 @@ export async function requireApiUser() {
 
   return {
     success: true,
-    user,
+    auth: {
+      userId: user.id,
+      email: user.email,
+      name: user.name,
+      businessId: user.businessId,
+      role: user.role,
+    },
   } as const;
 }

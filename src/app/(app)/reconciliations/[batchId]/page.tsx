@@ -59,9 +59,7 @@ export default async function ReconciliationBatchPage({
   const batch = await prisma.uploadBatch.findFirst({
     where: {
       id: batchId,
-      business: {
-        ownerId: user.id,
-      },
+      businessId: user.businessId,
     },
     select: {
       id: true,

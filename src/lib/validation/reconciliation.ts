@@ -50,6 +50,11 @@ export const createReconciliationBatchSchema = z.object({
   storageObjectKey: storageObjectKeySchema,
 });
 
+export const createOwnedReconciliationBatchSchema =
+  createReconciliationBatchSchema.omit({
+    businessId: true,
+  });
+
 export type CreateReferenceImportInput = z.infer<
   typeof createReferenceImportSchema
 >;
@@ -58,4 +63,7 @@ export type CreateOwnedReferenceImportInput = z.infer<
 >;
 export type CreateReconciliationBatchInput = z.infer<
   typeof createReconciliationBatchSchema
+>;
+export type CreateOwnedReconciliationBatchInput = z.infer<
+  typeof createOwnedReconciliationBatchSchema
 >;
