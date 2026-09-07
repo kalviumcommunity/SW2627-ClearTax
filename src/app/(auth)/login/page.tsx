@@ -26,10 +26,10 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
         <div>
           <p className="text-sm font-semibold text-primary">ClearTax</p>
           <h1 className="mt-3 text-2xl font-semibold text-foreground">
-            Sign in to reconciliation
+            Access reconciliation
           </h1>
           <p className="mt-2 text-sm text-slate-500">
-            Use your seeded demo account to access the workspace.
+            Sign in or create your first business workspace.
           </p>
         </div>
 
