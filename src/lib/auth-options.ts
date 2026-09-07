@@ -39,45 +39,51 @@ export const authOptions: AuthOptions = {
         }
 
         const { email, password } = validationResult.data;
-        const prisma = getPrismaClient();
 
-        const user = await prisma.user.findUnique({
-          where: {
-            email,
-          },
-          select: {
-            id: true,
-            email: true,
-            name: true,
-            passwordHash: true,
-            businesses: {
-              orderBy: {
-                createdAt: "asc",
-              },
-              select: {
-                id: true,
-              },
-              take: 1,
+        try {
+          const prisma = getPrismaClient();
+
+          const user = await prisma.user.findUnique({
+            where: {
+              email,
             },
-          },
-        });
+            select: {
+              id: true,
+              email: true,
+              name: true,
+              passwordHash: true,
+              businesses: {
+                orderBy: {
+                  createdAt: "asc",
+                },
+                select: {
+                  id: true,
+                },
+                take: 1,
+              },
+            },
+          });
 
-        const passwordHash = user?.passwordHash ?? INVALID_CREDENTIALS_HASH;
-        const validPassword = await bcrypt.compare(password, passwordHash);
-        const businessId = user?.businesses[0]?.id;
+          const passwordHash = user?.passwordHash ?? INVALID_CREDENTIALS_HASH;
+          const validPassword = await bcrypt.compare(password, passwordHash);
+          const businessId = user?.businesses[0]?.id;
 
-        if (!user || !user.passwordHash || !validPassword || !businessId) {
-          return null;
+          if (!user || !user.passwordHash || !validPassword || !businessId) {
+            return null;
+          }
+
+          return {
+            id: user.id,
+            userId: user.id,
+            email: user.email,
+            name: user.name,
+            businessId,
+            role: OWNER_ROLE,
+          } satisfies AuthorizedUser;
+        } catch (error) {
+          logCredentialsAuthError(error);
+          throw new Error("AuthenticationServiceUnavailable");
         }
-
-        return {
-          id: user.id,
-          userId: user.id,
-          email: user.email,
-          name: user.name,
-          businessId,
-          role: OWNER_ROLE,
-        } satisfies AuthorizedUser;
       },
     }),
     ...getGoogleProvider(),
@@ -193,6 +199,28 @@ async function getAuthContextByEmail(email: string) {
     businessId,
     role: OWNER_ROLE,
   } satisfies AuthContext;
+}
+
+function logCredentialsAuthError(error: unknown) {
+  const details =
+    error instanceof Error
+      ? {
+          name: error.name,
+          code:
+            "code" in error && typeof error.code === "string"
+              ? error.code
+              : undefined,
+          clientVersion:
+            "clientVersion" in error &&
+            typeof error.clientVersion === "string"
+              ? error.clientVersion
+              : undefined,
+        }
+      : {
+          name: "UnknownError",
+        };
+
+  console.error("Credentials authentication failed unexpectedly", details);
 }
 
 function getGoogleProvider() {
