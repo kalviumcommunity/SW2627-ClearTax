@@ -263,6 +263,14 @@ cp .env.example .env
 
 Replace the placeholder values in `.env` with local development values. At minimum, local development requires `DATABASE_URL` so Prisma can connect to PostgreSQL and `AUTH_SECRET` so Auth.js can encrypt JWT-backed sessions. Use `APP_URL="http://localhost:3000"` and `NEXTAUTH_URL="http://localhost:3000"` for the local Next.js app unless you run it on a different origin.
 
+Apply the committed Prisma migrations before seeding or running application workflows that use the database:
+
+```bash
+npx prisma migrate dev
+```
+
+See [`docs/database-migrations.md`](docs/database-migrations.md) for the full schema-evolution workflow, including production deployment with committed migrations.
+
 After applying migrations, seed the local demo account and business:
 
 ```bash
