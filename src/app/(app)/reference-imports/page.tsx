@@ -50,7 +50,6 @@ export default async function ReferenceImportsPage() {
       id: true,
       originalFilename: true,
       status: true,
-      gstin: true,
       financialYear: true,
       returnPeriod: true,
       totalDocuments: true,
