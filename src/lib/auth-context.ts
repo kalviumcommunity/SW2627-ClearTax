@@ -1,4 +1,4 @@
-export type AuthRole = "OWNER";
+export type AuthRole = "OWNER" | "ADMIN" | "ACCOUNTANT";
 
 export type AuthContext = {
   userId: string;
