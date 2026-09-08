@@ -9,10 +9,20 @@ const globalForPrisma = globalThis as unknown as {
 };
 
 const poolConfig = {
-  connectionTimeoutMillis: 10_000,
-  idleTimeoutMillis: 10_000,
-  max: 2,
+  application_name: "sw2627-cleartax",
+  connectionTimeoutMillis: 15_000,
+  idleTimeoutMillis: 60_000,
+  keepAlive: true,
+  keepAliveInitialDelayMillis: 10_000,
+  max: 5,
 };
+
+const transientDatabaseErrorCodes = new Set([
+  "ECONNRESET",
+  "ENOTFOUND",
+  "ETIMEDOUT",
+  "P1001",
+]);
 
 function createPrismaClient(connectionString: string) {
   const pool = new pg.Pool({
@@ -43,15 +53,52 @@ export function getPrismaClient() {
     poolConfig,
   });
 
-  const prisma =
-    globalForPrisma.prismaCacheKey === cacheKey && globalForPrisma.prisma
-      ? globalForPrisma.prisma
-      : createPrismaClient(normalizedConnectionString);
-
-  if (process.env.NODE_ENV !== "production") {
-    globalForPrisma.prisma = prisma;
-    globalForPrisma.prismaCacheKey = cacheKey;
+  if (globalForPrisma.prismaCacheKey === cacheKey && globalForPrisma.prisma) {
+    return globalForPrisma.prisma;
   }
 
+  if (globalForPrisma.prisma) {
+    void globalForPrisma.prisma.$disconnect().catch((error: unknown) => {
+      console.error("Failed to disconnect stale Prisma client", error);
+    });
+  }
+
+  const prisma = createPrismaClient(normalizedConnectionString);
+
+  globalForPrisma.prisma = prisma;
+  globalForPrisma.prismaCacheKey = cacheKey;
+
   return prisma;
+}
+
+export async function withDatabaseRetry<T>(operation: () => Promise<T>) {
+  try {
+    return await operation();
+  } catch (error) {
+    if (!isTransientDatabaseError(error)) {
+      throw error;
+    }
+
+    await new Promise((resolve) => setTimeout(resolve, 500));
+    return operation();
+  }
+}
+
+function isTransientDatabaseError(error: unknown) {
+  if (!(error instanceof Error)) {
+    return false;
+  }
+
+  const code =
+    "code" in error && typeof error.code === "string" ? error.code : null;
+
+  if (code && transientDatabaseErrorCodes.has(code)) {
+    return true;
+  }
+
+  return (
+    error.message.includes("connection timeout") ||
+    error.message.includes("Connection terminated") ||
+    error.message.includes("Can't reach database server")
+  );
 }

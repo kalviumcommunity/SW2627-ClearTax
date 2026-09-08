@@ -61,6 +61,9 @@ export async function createReconciliationSetup(
       originalFilename,
       ...(storageObjectKey ? { storageObjectKey } : {}),
     },
+    select: {
+      id: true,
+    },
   });
 
   revalidatePath("/reference-imports");
