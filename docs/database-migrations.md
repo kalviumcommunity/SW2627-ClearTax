@@ -212,3 +212,17 @@ npx prisma migrate status
 ```
 
 Only run `migrate status` against an environment where it is acceptable for Prisma to connect and inspect migration state. Do not run destructive commands against shared or production databases.
+
+## Demo Seed Data
+
+After applying migrations to a local development database, populate the ClearTax demo workspace with:
+
+```bash
+npm run db:seed
+```
+
+The seed creates one development-only credentials user, one owned business, one active GSTR-2B-like reference import, ten reference invoices, and one completed reconciliation demo batch with matched, mismatched, and row-error results. It uses fixed demo values and fixed demo record IDs for the reference import, upload batch, invoices, and reconciliation rows.
+
+Rerunning the command is intentional and idempotent: the demo user and business are upserted, reference invoices and batch metadata are upserted by deterministic IDs, and only rows belonging to the deterministic demo batch are replaced before being recreated. It does not globally clear tables or delete unrelated local records.
+
+The command requires `DATABASE_URL` to point at a migrated local development PostgreSQL database. The seeded login is `demo@cleartax.local` with password `ClearTaxDemo#2026`; do not use these values outside development or demos.
