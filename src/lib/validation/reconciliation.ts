@@ -11,6 +11,10 @@ const gstinPattern =
 export const businessIdSchema = uuidString("businessId");
 export const batchIdSchema = uuidString("batchId");
 export const referenceImportIdSchema = uuidString("referenceImportId");
+export const reconciliationResultCursorSchema = uuidString("cursor");
+
+export const DEFAULT_RECONCILIATION_RESULTS_LIMIT = 50;
+export const MAX_RECONCILIATION_RESULTS_LIMIT = 100;
 
 export const gstinSchema = requiredTrimmedString("gstin")
   .length(15, "gstin must be exactly 15 characters.")
@@ -27,6 +31,40 @@ export const batchRouteParamsSchema = z.object({
 
 export const referenceImportRouteParamsSchema = z.object({
   referenceImportId: referenceImportIdSchema,
+});
+
+export const reconciliationResultsQuerySchema = z.object({
+  limit: z.preprocess(
+    (value) => {
+      if (value === undefined) {
+        return undefined;
+      }
+
+      if (typeof value !== "string") {
+        return value;
+      }
+
+      const trimmedValue = value.trim();
+
+      if (!/^\d+$/.test(trimmedValue)) {
+        return Number.NaN;
+      }
+
+      return Number(trimmedValue);
+    },
+    z
+      .number({
+        error: "limit must be a positive integer.",
+      })
+      .int("limit must be a positive integer.")
+      .min(1, "limit must be at least 1.")
+      .max(
+        MAX_RECONCILIATION_RESULTS_LIMIT,
+        `limit must be ${MAX_RECONCILIATION_RESULTS_LIMIT} or fewer.`,
+      )
+      .default(DEFAULT_RECONCILIATION_RESULTS_LIMIT),
+  ),
+  cursor: reconciliationResultCursorSchema.optional(),
 });
 
 export const createReferenceImportSchema = z.object({
@@ -66,4 +104,7 @@ export type CreateReconciliationBatchInput = z.infer<
 >;
 export type CreateOwnedReconciliationBatchInput = z.infer<
   typeof createOwnedReconciliationBatchSchema
+>;
+export type ReconciliationResultsQueryInput = z.infer<
+  typeof reconciliationResultsQuerySchema
 >;
