@@ -67,6 +67,15 @@ export const reconciliationResultsQuerySchema = z.object({
   cursor: reconciliationResultCursorSchema.optional(),
 });
 
+export const referenceImportUploadFormSchema = z.object({
+  financialYear: financialYearSchema.optional(),
+  returnPeriod: returnPeriodSchema.optional(),
+});
+
+export const reconciliationBatchUploadFormSchema = z.object({
+  referenceImportId: referenceImportIdSchema,
+});
+
 export const createReferenceImportSchema = z.object({
   businessId: businessIdSchema,
   gstin: gstinSchema,
@@ -107,4 +116,10 @@ export type CreateOwnedReconciliationBatchInput = z.infer<
 >;
 export type ReconciliationResultsQueryInput = z.infer<
   typeof reconciliationResultsQuerySchema
+>;
+export type ReferenceImportUploadFormInput = z.infer<
+  typeof referenceImportUploadFormSchema
+>;
+export type ReconciliationBatchUploadFormInput = z.infer<
+  typeof reconciliationBatchUploadFormSchema
 >;
