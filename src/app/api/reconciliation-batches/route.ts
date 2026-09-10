@@ -1,5 +1,7 @@
 import {
+  API_ERROR_CODES,
   apiError,
+  handleApiError,
   parseJsonObject,
   successResponse,
   validationErrorResponse,
@@ -9,7 +11,6 @@ import { getPrismaClient } from "@/lib/prisma";
 import {
   completeApiRequest,
   createApiRequestLogContext,
-  logApiRequestFailure,
   logUnauthorizedRequest,
   logUploadValidationFailed,
   type ApiRequestLogContext,
@@ -107,16 +108,7 @@ export async function GET(request: Request) {
       },
     );
   } catch (error) {
-    logApiRequestFailure(requestContext, error);
-
-    return completeApiRequest(
-      requestContext,
-      apiError(
-        500,
-        "INTERNAL_SERVER_ERROR",
-        "An unexpected server error occurred.",
-      ),
-    );
+    return handleApiError(requestContext, error);
   }
 }
 
@@ -187,7 +179,7 @@ export async function POST(request: Request) {
         requestContext,
         apiError(
           404,
-          "BUSINESS_NOT_FOUND",
+          API_ERROR_CODES.NOT_FOUND,
           "The requested business was not found.",
         ),
       );
@@ -208,7 +200,7 @@ export async function POST(request: Request) {
         requestContext,
         apiError(
           404,
-          "REFERENCE_IMPORT_NOT_FOUND",
+          API_ERROR_CODES.REFERENCE_IMPORT_NOT_FOUND,
           "The requested reference import was not found.",
         ),
       );
@@ -249,18 +241,9 @@ export async function POST(request: Request) {
       },
     );
   } catch (error) {
-    logApiRequestFailure(requestContext, error, {
+    return handleApiError(requestContext, error, {
       referenceImportId,
     });
-
-    return completeApiRequest(
-      requestContext,
-      apiError(
-        500,
-        "INTERNAL_SERVER_ERROR",
-        "An unexpected server error occurred.",
-      ),
-    );
   }
 }
 
@@ -378,7 +361,7 @@ async function createReconciliationBatchFromUpload(
         requestContext,
         apiError(
           404,
-          "BUSINESS_NOT_FOUND",
+          API_ERROR_CODES.NOT_FOUND,
           "The requested business was not found.",
         ),
       );
@@ -415,7 +398,7 @@ async function createReconciliationBatchFromUpload(
         requestContext,
         apiError(
           404,
-          "REFERENCE_IMPORT_NOT_FOUND",
+          API_ERROR_CODES.REFERENCE_IMPORT_NOT_FOUND,
           "The requested reference import was not found.",
         ),
       );
@@ -465,18 +448,9 @@ async function createReconciliationBatchFromUpload(
       },
       "Purchase register upload failed",
     );
-    logApiRequestFailure(requestContext, error, {
+    return handleApiError(requestContext, error, {
       referenceImportId,
     });
-
-    return completeApiRequest(
-      requestContext,
-      apiError(
-        500,
-        "INTERNAL_SERVER_ERROR",
-        "An unexpected server error occurred.",
-      ),
-    );
   }
 }
 

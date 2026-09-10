@@ -1,5 +1,7 @@
 import {
+  API_ERROR_CODES,
   apiError,
+  handleApiError,
   successResponse,
   validationErrorResponse,
 } from "@/lib/api-response";
@@ -8,7 +10,6 @@ import { getPrismaClient } from "@/lib/prisma";
 import {
   completeApiRequest,
   createApiRequestLogContext,
-  logApiRequestFailure,
   logUnauthorizedRequest,
 } from "@/lib/request-logging";
 import { referenceImportRouteParamsSchema } from "@/lib/validation/reconciliation";
@@ -107,7 +108,7 @@ export async function GET(
         requestContext,
         apiError(
           404,
-          "REFERENCE_IMPORT_NOT_FOUND",
+          API_ERROR_CODES.REFERENCE_IMPORT_NOT_FOUND,
           "The requested reference import was not found.",
         ),
         {
@@ -120,20 +121,8 @@ export async function GET(
       importId: referenceImportId,
     });
   } catch (error) {
-    logApiRequestFailure(requestContext, error, {
+    return handleApiError(requestContext, error, {
       importId: referenceImportId,
     });
-
-    return completeApiRequest(
-      requestContext,
-      apiError(
-        500,
-        "INTERNAL_SERVER_ERROR",
-        "An unexpected server error occurred.",
-      ),
-      {
-        importId: referenceImportId,
-      },
-    );
   }
 }

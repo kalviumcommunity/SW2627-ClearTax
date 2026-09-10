@@ -1,5 +1,7 @@
 import {
+  API_ERROR_CODES,
   apiError,
+  handleApiError,
   successResponse,
   validationErrorResponse,
 } from "@/lib/api-response";
@@ -8,7 +10,6 @@ import { getPrismaClient } from "@/lib/prisma";
 import {
   completeApiRequest,
   createApiRequestLogContext,
-  logApiRequestFailure,
   logUnauthorizedRequest,
 } from "@/lib/request-logging";
 import {
@@ -124,7 +125,7 @@ export async function GET(
         requestContext,
         apiError(
           404,
-          "BATCH_NOT_FOUND",
+          API_ERROR_CODES.BATCH_NOT_FOUND,
           "The requested reconciliation batch was not found.",
         ),
         {
@@ -149,7 +150,7 @@ export async function GET(
           requestContext,
           apiError(
             400,
-            "INVALID_CURSOR",
+            API_ERROR_CODES.VALIDATION_ERROR,
             "The requested cursor was not found for this reconciliation batch.",
           ),
           {
@@ -198,20 +199,8 @@ export async function GET(
       },
     );
   } catch (error) {
-    logApiRequestFailure(requestContext, error, {
+    return handleApiError(requestContext, error, {
       batchId,
     });
-
-    return completeApiRequest(
-      requestContext,
-      apiError(
-        500,
-        "INTERNAL_SERVER_ERROR",
-        "An unexpected server error occurred.",
-      ),
-      {
-        batchId,
-      },
-    );
   }
 }
