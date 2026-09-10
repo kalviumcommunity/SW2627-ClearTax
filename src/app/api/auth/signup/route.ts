@@ -1,7 +1,9 @@
 import bcrypt from "bcrypt";
 import { Prisma } from "@/generated/prisma/client";
 import {
+  API_ERROR_CODES,
   apiError,
+  handleApiError,
   parseJsonObject,
   successResponse,
   validationErrorResponse,
@@ -10,7 +12,6 @@ import { getPrismaClient } from "@/lib/prisma";
 import {
   completeApiRequest,
   createApiRequestLogContext,
-  logApiRequestFailure,
 } from "@/lib/request-logging";
 import { signupSchema } from "@/lib/validation/auth";
 
@@ -103,23 +104,14 @@ export async function POST(request: Request) {
         requestContext,
         apiError(
           409,
-          "SIGNUP_CONFLICT",
+          API_ERROR_CODES.CONFLICT,
           "An account or business with these details already exists.",
           getSignupConflictDetails(error),
         ),
       );
     }
 
-    logApiRequestFailure(requestContext, error);
-
-    return completeApiRequest(
-      requestContext,
-      apiError(
-        500,
-        "INTERNAL_SERVER_ERROR",
-        "An unexpected server error occurred.",
-      ),
-    );
+    return handleApiError(requestContext, error);
   }
 }
 

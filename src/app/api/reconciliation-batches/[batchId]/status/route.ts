@@ -1,5 +1,7 @@
 import {
+  API_ERROR_CODES,
   apiError,
+  handleApiError,
   successResponse,
   validationErrorResponse,
 } from "@/lib/api-response";
@@ -8,7 +10,6 @@ import { getPrismaClient } from "@/lib/prisma";
 import {
   completeApiRequest,
   createApiRequestLogContext,
-  logApiRequestFailure,
   logUnauthorizedRequest,
 } from "@/lib/request-logging";
 import { batchRouteParamsSchema } from "@/lib/validation/reconciliation";
@@ -77,7 +78,7 @@ export async function GET(
         requestContext,
         apiError(
           404,
-          "BATCH_NOT_FOUND",
+          API_ERROR_CODES.BATCH_NOT_FOUND,
           "The requested reconciliation batch was not found.",
         ),
         {
@@ -91,20 +92,8 @@ export async function GET(
       batchStatus: batchStatus.status,
     });
   } catch (error) {
-    logApiRequestFailure(requestContext, error, {
+    return handleApiError(requestContext, error, {
       batchId,
     });
-
-    return completeApiRequest(
-      requestContext,
-      apiError(
-        500,
-        "INTERNAL_SERVER_ERROR",
-        "An unexpected server error occurred.",
-      ),
-      {
-        batchId,
-      },
-    );
   }
 }

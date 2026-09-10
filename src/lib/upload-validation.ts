@@ -1,3 +1,9 @@
+import {
+  API_ERROR_CODES,
+  type ApiErrorCode,
+  type ApiErrorDetails,
+} from "@/lib/api-response";
+
 export const UPLOAD_FILE_FIELD_NAME = "file";
 export const MAX_UPLOAD_FILE_SIZE_BYTES = 10 * 1024 * 1024;
 export const MAX_PURCHASE_REGISTER_ROWS = 10_000;
@@ -31,9 +37,9 @@ export const REQUIRED_PURCHASE_REGISTER_HEADERS = [
 
 export type UploadValidationError = {
   status: number;
-  code: string;
+  code: ApiErrorCode;
   message: string;
-  details?: unknown;
+  details?: ApiErrorDetails;
 };
 
 type ValidationResult<T> =
@@ -88,7 +94,7 @@ export async function parseMultipartFormData(
   } catch {
     return uploadError(
       400,
-      "INVALID_MULTIPART_FORM",
+      API_ERROR_CODES.INVALID_FILE,
       "Request body must be valid multipart form data.",
     );
   }
@@ -103,7 +109,7 @@ export function getRequiredUploadFile(
   if (!isUploadedFile(value)) {
     return uploadError(
       400,
-      "MISSING_UPLOAD_FILE",
+      API_ERROR_CODES.INVALID_FILE,
       `Upload a file using the "${fieldName}" form field.`,
     );
   }
@@ -131,13 +137,13 @@ export async function readValidatedTextFile(
   } catch {
     return uploadError(
       400,
-      "UNREADABLE_UPLOAD_FILE",
+      API_ERROR_CODES.INVALID_FILE,
       "The uploaded file could not be read.",
     );
   }
 
   if (text.trim().length === 0) {
-    return uploadError(400, "EMPTY_UPLOAD_FILE", "Uploaded file is empty.");
+    return uploadError(400, API_ERROR_CODES.INVALID_FILE, "Uploaded file is empty.");
   }
 
   return {
@@ -157,7 +163,11 @@ export function validateGstr2bJson(
   try {
     parsed = JSON.parse(text);
   } catch {
-    return uploadError(400, "INVALID_JSON", "Uploaded JSON is malformed.");
+    return uploadError(
+      400,
+      API_ERROR_CODES.FILE_PARSE_ERROR,
+      "Uploaded JSON is malformed.",
+    );
   }
 
   if (!isRecord(parsed)) {
@@ -305,7 +315,7 @@ export function validatePurchaseRegisterCsv(
   if (rows.length === 0) {
     return uploadError(
       400,
-      "INVALID_CSV_HEADERS",
+      API_ERROR_CODES.INVALID_FILE_HEADERS,
       "Purchase Register CSV is missing a header row.",
     );
   }
@@ -316,7 +326,7 @@ export function validatePurchaseRegisterCsv(
   if (duplicateHeaders.length > 0) {
     return uploadError(
       400,
-      "DUPLICATE_CSV_HEADERS",
+      API_ERROR_CODES.INVALID_FILE_HEADERS,
       "Purchase Register CSV contains duplicate columns.",
       {
         duplicateHeaders,
@@ -331,7 +341,7 @@ export function validatePurchaseRegisterCsv(
   if (missingHeaders.length > 0) {
     return uploadError(
       400,
-      "INVALID_CSV_HEADERS",
+      API_ERROR_CODES.INVALID_FILE_HEADERS,
       "Purchase Register CSV is missing required columns.",
       {
         missingHeaders,
@@ -344,7 +354,7 @@ export function validatePurchaseRegisterCsv(
   if (totalRows === 0) {
     return uploadError(
       400,
-      "EMPTY_PURCHASE_REGISTER",
+      API_ERROR_CODES.INVALID_FILE,
       "Purchase Register CSV does not contain invoice rows.",
     );
   }
@@ -352,7 +362,7 @@ export function validatePurchaseRegisterCsv(
   if (totalRows > MAX_PURCHASE_REGISTER_ROWS) {
     return uploadError(
       400,
-      "TOO_MANY_CSV_ROWS",
+      API_ERROR_CODES.INVALID_FILE,
       `Purchase Register CSV cannot exceed ${MAX_PURCHASE_REGISTER_ROWS} invoice rows.`,
       {
         maxRows: MAX_PURCHASE_REGISTER_ROWS,
@@ -402,9 +412,9 @@ export function getRequiredFormString(formData: FormData, fieldName: string) {
 
 export function uploadError(
   status: number,
-  code: string,
+  code: ApiErrorCode,
   message: string,
-  details?: unknown,
+  details?: ApiErrorDetails,
 ): ValidationResult<never> {
   return {
     success: false,
@@ -422,13 +432,13 @@ function validateUploadedFileMetadata(
   config: FileValidationConfig,
 ): ValidationResult<Omit<ValidatedTextFile, "text">> {
   if (file.size === 0) {
-    return uploadError(400, "EMPTY_UPLOAD_FILE", "Uploaded file is empty.");
+    return uploadError(400, API_ERROR_CODES.INVALID_FILE, "Uploaded file is empty.");
   }
 
   if (file.size > MAX_UPLOAD_FILE_SIZE_BYTES) {
     return uploadError(
       413,
-      "UPLOAD_FILE_TOO_LARGE",
+      API_ERROR_CODES.FILE_TOO_LARGE,
       `Uploaded file exceeds the ${formatMegabytes(
         MAX_UPLOAD_FILE_SIZE_BYTES,
       )} limit.`,
@@ -444,7 +454,7 @@ function validateUploadedFileMetadata(
   if (!config.acceptedExtensions.includes(extension)) {
     return uploadError(
       400,
-      "UNSUPPORTED_FILE_EXTENSION",
+      API_ERROR_CODES.INVALID_FILE_TYPE,
       `${config.fileKind} uploads must use ${formatList(
         config.acceptedExtensions,
       )} files.`,
@@ -459,7 +469,7 @@ function validateUploadedFileMetadata(
   if (contentType && !config.acceptedMimeTypes.has(contentType)) {
     return uploadError(
       400,
-      "UNSUPPORTED_MIME_TYPE",
+      API_ERROR_CODES.INVALID_FILE_TYPE,
       `${config.fileKind} upload has an unsupported content type.`,
       {
         acceptedMimeTypes: Array.from(config.acceptedMimeTypes),
@@ -545,11 +555,11 @@ function parseCsv(text: string): ValidationResult<string[][]> {
 }
 
 function malformedCsv(message: string): ValidationResult<never> {
-  return uploadError(400, "MALFORMED_CSV", message);
+  return uploadError(400, API_ERROR_CODES.FILE_PARSE_ERROR, message);
 }
 
 function invalidGstr2bStructure(message: string): ValidationResult<never> {
-  return uploadError(400, "INVALID_GSTR2B_STRUCTURE", message);
+  return uploadError(400, API_ERROR_CODES.INVALID_FILE, message);
 }
 
 function sanitizeOriginalFilename(filename: string) {

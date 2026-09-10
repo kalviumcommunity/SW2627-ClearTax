@@ -1,4 +1,4 @@
-import { apiError } from "@/lib/api-response";
+import { API_ERROR_CODES, apiError } from "@/lib/api-response";
 import { getCurrentUser } from "@/lib/auth";
 
 export async function requireApiUser() {
@@ -7,7 +7,11 @@ export async function requireApiUser() {
   if (!user) {
     return {
       success: false,
-      response: apiError(401, "UNAUTHORIZED", "Authentication is required."),
+      response: apiError(
+        401,
+        API_ERROR_CODES.UNAUTHORIZED,
+        "Authentication is required.",
+      ),
     } as const;
   }
 

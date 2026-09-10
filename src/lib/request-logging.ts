@@ -15,7 +15,10 @@ export type ApiRequestLogContext = {
   logger: AppLogger;
 };
 
-type LogMetadata = Record<string, string | number | boolean | null | undefined>;
+export type LogMetadata = Record<
+  string,
+  string | number | boolean | null | undefined
+>;
 
 export function createApiRequestLogContext(
   request: Request,

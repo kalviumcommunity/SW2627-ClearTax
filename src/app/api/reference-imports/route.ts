@@ -1,5 +1,7 @@
 import {
+  API_ERROR_CODES,
   apiError,
+  handleApiError,
   parseJsonObject,
   successResponse,
   validationErrorResponse,
@@ -9,7 +11,6 @@ import { getPrismaClient } from "@/lib/prisma";
 import {
   completeApiRequest,
   createApiRequestLogContext,
-  logApiRequestFailure,
   logUnauthorizedRequest,
   logUploadValidationFailed,
   type ApiRequestLogContext,
@@ -103,16 +104,7 @@ export async function GET(request: Request) {
       },
     );
   } catch (error) {
-    logApiRequestFailure(requestContext, error);
-
-    return completeApiRequest(
-      requestContext,
-      apiError(
-        500,
-        "INTERNAL_SERVER_ERROR",
-        "An unexpected server error occurred.",
-      ),
-    );
+    return handleApiError(requestContext, error);
   }
 }
 
@@ -186,7 +178,7 @@ export async function POST(request: Request) {
         requestContext,
         apiError(
           404,
-          "BUSINESS_NOT_FOUND",
+          API_ERROR_CODES.NOT_FOUND,
           "The requested business was not found.",
         ),
       );
@@ -226,16 +218,7 @@ export async function POST(request: Request) {
       },
     );
   } catch (error) {
-    logApiRequestFailure(requestContext, error);
-
-    return completeApiRequest(
-      requestContext,
-      apiError(
-        500,
-        "INTERNAL_SERVER_ERROR",
-        "An unexpected server error occurred.",
-      ),
-    );
+    return handleApiError(requestContext, error);
   }
 }
 
@@ -353,7 +336,7 @@ async function createReferenceImportFromUpload(
         requestContext,
         apiError(
           404,
-          "BUSINESS_NOT_FOUND",
+          API_ERROR_CODES.NOT_FOUND,
           "The requested business was not found.",
         ),
       );
@@ -370,7 +353,7 @@ async function createReferenceImportFromUpload(
         requestContext,
         apiError(
           400,
-          "GSTR2B_GSTIN_MISMATCH",
+          API_ERROR_CODES.INVALID_FILE,
           "Uploaded GSTR-2B GSTIN does not match the authenticated business.",
         ),
       );
@@ -392,7 +375,7 @@ async function createReferenceImportFromUpload(
         requestContext,
         apiError(
           400,
-          "GSTR2B_RETURN_PERIOD_MISMATCH",
+          API_ERROR_CODES.INVALID_FILE,
           "Uploaded GSTR-2B return period does not match the submitted return period.",
         ),
       );
@@ -409,7 +392,7 @@ async function createReferenceImportFromUpload(
         requestContext,
         apiError(
           400,
-          "INVALID_GSTR2B_STRUCTURE",
+          API_ERROR_CODES.INVALID_FILE,
           "GSTR-2B return period is required.",
         ),
       );
@@ -429,7 +412,7 @@ async function createReferenceImportFromUpload(
         requestContext,
         apiError(
           400,
-          "VALIDATION_ERROR",
+          API_ERROR_CODES.VALIDATION_ERROR,
           "The request contains invalid fields.",
           {
             financialYear: [
@@ -483,16 +466,7 @@ async function createReferenceImportFromUpload(
       },
       "Reference import upload failed",
     );
-    logApiRequestFailure(requestContext, error);
-
-    return completeApiRequest(
-      requestContext,
-      apiError(
-        500,
-        "INTERNAL_SERVER_ERROR",
-        "An unexpected server error occurred.",
-      ),
-    );
+    return handleApiError(requestContext, error);
   }
 }
 
