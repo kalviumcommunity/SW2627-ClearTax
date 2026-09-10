@@ -7,6 +7,14 @@ import {
 import { requireApiUser } from "@/lib/api-auth";
 import { getPrismaClient } from "@/lib/prisma";
 import {
+  completeApiRequest,
+  createApiRequestLogContext,
+  logApiRequestFailure,
+  logUnauthorizedRequest,
+  logUploadValidationFailed,
+  type ApiRequestLogContext,
+} from "@/lib/request-logging";
+import {
   createOwnedReconciliationBatchSchema,
   reconciliationBatchUploadFormSchema,
 } from "@/lib/validation/reconciliation";
@@ -65,11 +73,16 @@ const batchSelect = {
   },
 } as const;
 
-export async function GET() {
+export async function GET(request: Request) {
+  const requestContext = createApiRequestLogContext(
+    request,
+    "/api/reconciliation-batches",
+  );
   const authResult = await requireApiUser();
 
   if (!authResult.success) {
-    return authResult.response;
+    logUnauthorizedRequest(requestContext);
+    return completeApiRequest(requestContext, authResult.response);
   }
 
   try {
@@ -86,33 +99,51 @@ export async function GET() {
       take: 25,
     });
 
-    return successResponse(batches);
+    return completeApiRequest(
+      requestContext,
+      successResponse(batches),
+      {
+        resultCount: batches.length,
+      },
+    );
   } catch (error) {
-    console.error("Failed to list reconciliation batches", error);
+    logApiRequestFailure(requestContext, error);
 
-    return apiError(
-      500,
-      "INTERNAL_SERVER_ERROR",
-      "An unexpected server error occurred.",
+    return completeApiRequest(
+      requestContext,
+      apiError(
+        500,
+        "INTERNAL_SERVER_ERROR",
+        "An unexpected server error occurred.",
+      ),
     );
   }
 }
 
 export async function POST(request: Request) {
+  const requestContext = createApiRequestLogContext(
+    request,
+    "/api/reconciliation-batches",
+  );
   const authResult = await requireApiUser();
 
   if (!authResult.success) {
-    return authResult.response;
+    logUnauthorizedRequest(requestContext);
+    return completeApiRequest(requestContext, authResult.response);
   }
 
   if (isMultipartRequest(request)) {
-    return createReconciliationBatchFromUpload(request, authResult.auth);
+    return createReconciliationBatchFromUpload(
+      request,
+      authResult.auth,
+      requestContext,
+    );
   }
 
   const parsedBody = await parseJsonObject(request);
 
   if (!parsedBody.success) {
-    return parsedBody.response;
+    return completeApiRequest(requestContext, parsedBody.response);
   }
 
   const validationResult = createOwnedReconciliationBatchSchema.safeParse(
@@ -120,7 +151,10 @@ export async function POST(request: Request) {
   );
 
   if (!validationResult.success) {
-    return validationErrorResponse(validationResult.error);
+    return completeApiRequest(
+      requestContext,
+      validationErrorResponse(validationResult.error),
+    );
   }
 
   const { referenceImportId, originalFilename, storageObjectKey } =
@@ -128,6 +162,13 @@ export async function POST(request: Request) {
 
   try {
     const prisma = getPrismaClient();
+    requestContext.logger.info(
+      {
+        event: "batch.creation_started",
+        referenceImportId,
+      },
+      "Reconciliation batch creation started",
+    );
     // Resolve business context first because the reference import
     // must belong to the resolved business before creating a batch.
 
@@ -142,10 +183,13 @@ export async function POST(request: Request) {
     });
 
     if (!business) {
-      return apiError(
-        404,
-        "BUSINESS_NOT_FOUND",
-        "The requested business was not found.",
+      return completeApiRequest(
+        requestContext,
+        apiError(
+          404,
+          "BUSINESS_NOT_FOUND",
+          "The requested business was not found.",
+        ),
       );
     }
 
@@ -160,10 +204,13 @@ export async function POST(request: Request) {
     });
 
     if (!referenceImport) {
-      return apiError(
-        404,
-        "REFERENCE_IMPORT_NOT_FOUND",
-        "The requested reference import was not found.",
+      return completeApiRequest(
+        requestContext,
+        apiError(
+          404,
+          "REFERENCE_IMPORT_NOT_FOUND",
+          "The requested reference import was not found.",
+        ),
       );
     }
 
@@ -182,16 +229,37 @@ export async function POST(request: Request) {
     revalidatePath("/reference-imports");
     revalidatePath(`/reference-imports/${referenceImportId}`);
 
-    return successResponse(batch, {
-      status: 201,
-    });
-  } catch (error) {
-    console.error("Failed to create reconciliation batch", error);
+    requestContext.logger.info(
+      {
+        event: "batch.created",
+        batchId: batch.id,
+        referenceImportId,
+      },
+      "Reconciliation batch created",
+    );
 
-    return apiError(
-      500,
-      "INTERNAL_SERVER_ERROR",
-      "An unexpected server error occurred.",
+    return completeApiRequest(
+      requestContext,
+      successResponse(batch, {
+        status: 201,
+      }),
+      {
+        batchId: batch.id,
+        referenceImportId,
+      },
+    );
+  } catch (error) {
+    logApiRequestFailure(requestContext, error, {
+      referenceImportId,
+    });
+
+    return completeApiRequest(
+      requestContext,
+      apiError(
+        500,
+        "INTERNAL_SERVER_ERROR",
+        "An unexpected server error occurred.",
+      ),
     );
   }
 }
@@ -199,11 +267,23 @@ export async function POST(request: Request) {
 async function createReconciliationBatchFromUpload(
   request: Request,
   auth: ApiAuthContext,
+  requestContext: ApiRequestLogContext,
 ) {
+  requestContext.logger.info(
+    {
+      event: "purchase_register_import.started",
+      uploadType: "multipart",
+    },
+    "Purchase register upload started",
+  );
+
   const formDataResult = await parseMultipartFormData(request);
 
   if (!formDataResult.success) {
-    return uploadErrorResponse(formDataResult.error);
+    return completeApiRequest(
+      requestContext,
+      uploadErrorResponse(requestContext, formDataResult.error),
+    );
   }
 
   const formValidationResult = reconciliationBatchUploadFormSchema.safeParse({
@@ -214,14 +294,34 @@ async function createReconciliationBatchFromUpload(
   });
 
   if (!formValidationResult.success) {
-    return validationErrorResponse(formValidationResult.error);
+    logUploadValidationFailed(requestContext.logger, {
+      importType: "purchase_register",
+      reason: "invalid_form_fields",
+    });
+    return completeApiRequest(
+      requestContext,
+      validationErrorResponse(formValidationResult.error),
+    );
   }
 
   const fileResult = getRequiredUploadFile(formDataResult.data);
 
   if (!fileResult.success) {
-    return uploadErrorResponse(fileResult.error);
+    return completeApiRequest(
+      requestContext,
+      uploadErrorResponse(requestContext, fileResult.error),
+    );
   }
+
+  requestContext.logger.info(
+    {
+      event: "upload.received",
+      importType: "purchase_register",
+      fileType: fileResult.data.type || null,
+      fileSize: fileResult.data.size,
+    },
+    "Upload received",
+  );
 
   const fileResultData = await readValidatedTextFile(fileResult.data, {
     acceptedExtensions: CSV_UPLOAD_EXTENSIONS,
@@ -230,7 +330,10 @@ async function createReconciliationBatchFromUpload(
   });
 
   if (!fileResultData.success) {
-    return uploadErrorResponse(fileResultData.error);
+    return completeApiRequest(
+      requestContext,
+      uploadErrorResponse(requestContext, fileResultData.error),
+    );
   }
 
   const csvValidationResult = validatePurchaseRegisterCsv(
@@ -238,10 +341,24 @@ async function createReconciliationBatchFromUpload(
   );
 
   if (!csvValidationResult.success) {
-    return uploadErrorResponse(csvValidationResult.error);
+    return completeApiRequest(
+      requestContext,
+      uploadErrorResponse(requestContext, csvValidationResult.error),
+    );
   }
 
   const { referenceImportId } = formValidationResult.data;
+  requestContext.logger.info(
+    {
+      event: "upload.validation_succeeded",
+      importType: "purchase_register",
+      referenceImportId,
+      fileType: fileResultData.data.contentType,
+      fileSize: fileResult.data.size,
+      rowCount: csvValidationResult.data.totalRows,
+    },
+    "Upload validation succeeded",
+  );
 
   try {
     const prisma = getPrismaClient();
@@ -257,10 +374,13 @@ async function createReconciliationBatchFromUpload(
     });
 
     if (!business) {
-      return apiError(
-        404,
-        "BUSINESS_NOT_FOUND",
-        "The requested business was not found.",
+      return completeApiRequest(
+        requestContext,
+        apiError(
+          404,
+          "BUSINESS_NOT_FOUND",
+          "The requested business was not found.",
+        ),
       );
     }
 
@@ -291,10 +411,13 @@ async function createReconciliationBatchFromUpload(
     });
 
     if (!batch) {
-      return apiError(
-        404,
-        "REFERENCE_IMPORT_NOT_FOUND",
-        "The requested reference import was not found.",
+      return completeApiRequest(
+        requestContext,
+        apiError(
+          404,
+          "REFERENCE_IMPORT_NOT_FOUND",
+          "The requested reference import was not found.",
+        ),
       );
     }
 
@@ -303,20 +426,69 @@ async function createReconciliationBatchFromUpload(
     revalidatePath("/reference-imports");
     revalidatePath(`/reference-imports/${referenceImportId}`);
 
-    return successResponse(batch, {
-      status: 201,
-    });
-  } catch (error) {
-    console.error("Failed to create reconciliation batch from upload", error);
+    requestContext.logger.info(
+      {
+        event: "batch.created",
+        batchId: batch.id,
+        referenceImportId,
+        rowCount: csvValidationResult.data.totalRows,
+      },
+      "Reconciliation batch created from upload",
+    );
 
-    return apiError(
-      500,
-      "INTERNAL_SERVER_ERROR",
-      "An unexpected server error occurred.",
+    requestContext.logger.info(
+      {
+        event: "purchase_register_import.completed",
+        batchId: batch.id,
+        referenceImportId,
+        rowCount: csvValidationResult.data.totalRows,
+      },
+      "Purchase register upload completed",
+    );
+
+    return completeApiRequest(
+      requestContext,
+      successResponse(batch, {
+        status: 201,
+      }),
+      {
+        batchId: batch.id,
+        referenceImportId,
+      },
+    );
+  } catch (error) {
+    requestContext.logger.error(
+      {
+        event: "purchase_register_import.failed",
+        referenceImportId,
+        err: error,
+      },
+      "Purchase register upload failed",
+    );
+    logApiRequestFailure(requestContext, error, {
+      referenceImportId,
+    });
+
+    return completeApiRequest(
+      requestContext,
+      apiError(
+        500,
+        "INTERNAL_SERVER_ERROR",
+        "An unexpected server error occurred.",
+      ),
     );
   }
 }
 
-function uploadErrorResponse(error: UploadValidationError) {
+function uploadErrorResponse(
+  requestContext: ApiRequestLogContext,
+  error: UploadValidationError,
+) {
+  logUploadValidationFailed(requestContext.logger, {
+    importType: "purchase_register",
+    reason: error.code,
+    statusCode: error.status,
+  });
+
   return apiError(error.status, error.code, error.message, error.details);
 }

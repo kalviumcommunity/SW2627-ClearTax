@@ -7,6 +7,11 @@ import {
   validationErrorResponse,
 } from "@/lib/api-response";
 import { getPrismaClient } from "@/lib/prisma";
+import {
+  completeApiRequest,
+  createApiRequestLogContext,
+  logApiRequestFailure,
+} from "@/lib/request-logging";
 import { signupSchema } from "@/lib/validation/auth";
 
 export const dynamic = "force-dynamic";
@@ -15,16 +20,20 @@ export const runtime = "nodejs";
 const BCRYPT_SALT_ROUNDS = 12;
 
 export async function POST(request: Request) {
+  const requestContext = createApiRequestLogContext(request, "/api/auth/signup");
   const parsedBody = await parseJsonObject(request);
 
   if (!parsedBody.success) {
-    return parsedBody.response;
+    return completeApiRequest(requestContext, parsedBody.response);
   }
 
   const validationResult = signupSchema.safeParse(parsedBody.body);
 
   if (!validationResult.success) {
-    return validationErrorResponse(validationResult.error);
+    return completeApiRequest(
+      requestContext,
+      validationErrorResponse(validationResult.error),
+    );
   }
 
   const { email, name, password, businessLegalName, businessGstin } =
@@ -59,33 +68,57 @@ export async function POST(request: Request) {
       },
     });
 
-    return successResponse(
+    requestContext.logger.info(
       {
-        userId: user.id,
-        email: user.email,
-        name: user.name,
-        businessId: user.businesses[0]?.id,
+        event: "auth.signup.created",
       },
-      {
-        status: 201,
-      },
+      "Signup account created",
+    );
+
+    return completeApiRequest(
+      requestContext,
+      successResponse(
+        {
+          userId: user.id,
+          email: user.email,
+          name: user.name,
+          businessId: user.businesses[0]?.id,
+        },
+        {
+          status: 201,
+        },
+      ),
     );
   } catch (error) {
     if (isUniqueConstraintError(error)) {
-      return apiError(
-        409,
-        "SIGNUP_CONFLICT",
-        "An account or business with these details already exists.",
-        getSignupConflictDetails(error),
+      requestContext.logger.warn(
+        {
+          event: "auth.signup_conflict",
+          statusCode: 409,
+        },
+        "Signup conflict",
+      );
+
+      return completeApiRequest(
+        requestContext,
+        apiError(
+          409,
+          "SIGNUP_CONFLICT",
+          "An account or business with these details already exists.",
+          getSignupConflictDetails(error),
+        ),
       );
     }
 
-    console.error("Failed to create signup account", error);
+    logApiRequestFailure(requestContext, error);
 
-    return apiError(
-      500,
-      "INTERNAL_SERVER_ERROR",
-      "An unexpected server error occurred.",
+    return completeApiRequest(
+      requestContext,
+      apiError(
+        500,
+        "INTERNAL_SERVER_ERROR",
+        "An unexpected server error occurred.",
+      ),
     );
   }
 }

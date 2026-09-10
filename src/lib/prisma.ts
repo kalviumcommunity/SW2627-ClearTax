@@ -2,6 +2,7 @@ import { PrismaPg } from "@prisma/adapter-pg";
 import pg from "pg";
 import { PrismaClient } from "@/generated/prisma/client";
 import { normalizeDatabaseUrl } from "@/lib/database-url";
+import { logger } from "@/lib/logger";
 
 const globalForPrisma = globalThis as unknown as {
   prisma?: PrismaClient;
@@ -34,7 +35,13 @@ function createPrismaClient(connectionString: string) {
     adapter: new PrismaPg(pool, {
       disposeExternalPool: true,
       onPoolError(error) {
-        console.error("PostgreSQL idle client error", error);
+        logger.error(
+          {
+            event: "database.pool_error",
+            err: error,
+          },
+          "PostgreSQL idle client error",
+        );
       },
     }),
   });
@@ -59,7 +66,13 @@ export function getPrismaClient() {
 
   if (globalForPrisma.prisma) {
     void globalForPrisma.prisma.$disconnect().catch((error: unknown) => {
-      console.error("Failed to disconnect stale Prisma client", error);
+      logger.error(
+        {
+          event: "database.stale_client_disconnect_failed",
+          err: error,
+        },
+        "Failed to disconnect stale Prisma client",
+      );
     });
   }
 

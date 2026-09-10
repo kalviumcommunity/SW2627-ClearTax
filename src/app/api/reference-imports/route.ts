@@ -7,6 +7,14 @@ import {
 import { requireApiUser } from "@/lib/api-auth";
 import { getPrismaClient } from "@/lib/prisma";
 import {
+  completeApiRequest,
+  createApiRequestLogContext,
+  logApiRequestFailure,
+  logUnauthorizedRequest,
+  logUploadValidationFailed,
+  type ApiRequestLogContext,
+} from "@/lib/request-logging";
+import {
   createOwnedReferenceImportSchema,
   referenceImportUploadFormSchema,
 } from "@/lib/validation/reconciliation";
@@ -61,11 +69,16 @@ const referenceImportSelect = {
   },
 } as const;
 
-export async function GET() {
+export async function GET(request: Request) {
+  const requestContext = createApiRequestLogContext(
+    request,
+    "/api/reference-imports",
+  );
   const authResult = await requireApiUser();
 
   if (!authResult.success) {
-    return authResult.response;
+    logUnauthorizedRequest(requestContext);
+    return completeApiRequest(requestContext, authResult.response);
   }
 
   try {
@@ -82,33 +95,51 @@ export async function GET() {
       take: 25,
     });
 
-    return successResponse(referenceImports);
+    return completeApiRequest(
+      requestContext,
+      successResponse(referenceImports),
+      {
+        resultCount: referenceImports.length,
+      },
+    );
   } catch (error) {
-    console.error("Failed to list reference imports", error);
+    logApiRequestFailure(requestContext, error);
 
-    return apiError(
-      500,
-      "INTERNAL_SERVER_ERROR",
-      "An unexpected server error occurred.",
+    return completeApiRequest(
+      requestContext,
+      apiError(
+        500,
+        "INTERNAL_SERVER_ERROR",
+        "An unexpected server error occurred.",
+      ),
     );
   }
 }
 
 export async function POST(request: Request) {
+  const requestContext = createApiRequestLogContext(
+    request,
+    "/api/reference-imports",
+  );
   const authResult = await requireApiUser();
 
   if (!authResult.success) {
-    return authResult.response;
+    logUnauthorizedRequest(requestContext);
+    return completeApiRequest(requestContext, authResult.response);
   }
 
   if (isMultipartRequest(request)) {
-    return createReferenceImportFromUpload(request, authResult.auth);
+    return createReferenceImportFromUpload(
+      request,
+      authResult.auth,
+      requestContext,
+    );
   }
 
   const parsedBody = await parseJsonObject(request);
 
   if (!parsedBody.success) {
-    return parsedBody.response;
+    return completeApiRequest(requestContext, parsedBody.response);
   }
 
   const validationResult = createOwnedReferenceImportSchema.safeParse(
@@ -116,7 +147,10 @@ export async function POST(request: Request) {
   );
 
   if (!validationResult.success) {
-    return validationErrorResponse(validationResult.error);
+    return completeApiRequest(
+      requestContext,
+      validationErrorResponse(validationResult.error),
+    );
   }
 
   const {
@@ -129,6 +163,13 @@ export async function POST(request: Request) {
 
   try {
     const prisma = getPrismaClient();
+    requestContext.logger.info(
+      {
+        event: "reference_import.started",
+        importType: "gstr2b",
+      },
+      "Reference import creation started",
+    );
 
     const business = await prisma.business.findFirst({
       where: {
@@ -141,10 +182,13 @@ export async function POST(request: Request) {
     });
 
     if (!business) {
-      return apiError(
-        404,
-        "BUSINESS_NOT_FOUND",
-        "The requested business was not found.",
+      return completeApiRequest(
+        requestContext,
+        apiError(
+          404,
+          "BUSINESS_NOT_FOUND",
+          "The requested business was not found.",
+        ),
       );
     }
 
@@ -163,16 +207,34 @@ export async function POST(request: Request) {
     revalidatePath("/");
     revalidatePath("/reference-imports");
 
-    return successResponse(referenceImport, {
-      status: 201,
-    });
-  } catch (error) {
-    console.error("Failed to create reference import", error);
+    requestContext.logger.info(
+      {
+        event: "reference_import.completed",
+        importId: referenceImport.id,
+        importType: "gstr2b",
+      },
+      "Reference import created",
+    );
 
-    return apiError(
-      500,
-      "INTERNAL_SERVER_ERROR",
-      "An unexpected server error occurred.",
+    return completeApiRequest(
+      requestContext,
+      successResponse(referenceImport, {
+        status: 201,
+      }),
+      {
+        importId: referenceImport.id,
+      },
+    );
+  } catch (error) {
+    logApiRequestFailure(requestContext, error);
+
+    return completeApiRequest(
+      requestContext,
+      apiError(
+        500,
+        "INTERNAL_SERVER_ERROR",
+        "An unexpected server error occurred.",
+      ),
     );
   }
 }
@@ -180,18 +242,44 @@ export async function POST(request: Request) {
 async function createReferenceImportFromUpload(
   request: Request,
   auth: ApiAuthContext,
+  requestContext: ApiRequestLogContext,
 ) {
+  requestContext.logger.info(
+    {
+      event: "reference_import.started",
+      importType: "gstr2b",
+      uploadType: "multipart",
+    },
+    "Reference import upload started",
+  );
+
   const formDataResult = await parseMultipartFormData(request);
 
   if (!formDataResult.success) {
-    return uploadErrorResponse(formDataResult.error);
+    return completeApiRequest(
+      requestContext,
+      uploadErrorResponse(requestContext, formDataResult.error, "gstr2b"),
+    );
   }
 
   const fileResult = getRequiredUploadFile(formDataResult.data);
 
   if (!fileResult.success) {
-    return uploadErrorResponse(fileResult.error);
+    return completeApiRequest(
+      requestContext,
+      uploadErrorResponse(requestContext, fileResult.error, "gstr2b"),
+    );
   }
+
+  requestContext.logger.info(
+    {
+      event: "upload.received",
+      importType: "gstr2b",
+      fileType: fileResult.data.type || null,
+      fileSize: fileResult.data.size,
+    },
+    "Upload received",
+  );
 
   const fileResultData = await readValidatedTextFile(fileResult.data, {
     acceptedExtensions: JSON_UPLOAD_EXTENSIONS,
@@ -200,14 +288,35 @@ async function createReferenceImportFromUpload(
   });
 
   if (!fileResultData.success) {
-    return uploadErrorResponse(fileResultData.error);
+    return completeApiRequest(
+      requestContext,
+      uploadErrorResponse(requestContext, fileResultData.error, "gstr2b"),
+    );
   }
 
   const gstr2bValidationResult = validateGstr2bJson(fileResultData.data.text);
 
   if (!gstr2bValidationResult.success) {
-    return uploadErrorResponse(gstr2bValidationResult.error);
+    return completeApiRequest(
+      requestContext,
+      uploadErrorResponse(
+        requestContext,
+        gstr2bValidationResult.error,
+        "gstr2b",
+      ),
+    );
   }
+
+  requestContext.logger.info(
+    {
+      event: "upload.validation_succeeded",
+      importType: "gstr2b",
+      fileType: fileResultData.data.contentType,
+      fileSize: fileResult.data.size,
+      documentCount: gstr2bValidationResult.data.totalDocuments,
+    },
+    "Upload validation succeeded",
+  );
 
   const formValidationResult = referenceImportUploadFormSchema.safeParse({
     financialYear: getOptionalFormString(formDataResult.data, "financialYear"),
@@ -215,7 +324,14 @@ async function createReferenceImportFromUpload(
   });
 
   if (!formValidationResult.success) {
-    return validationErrorResponse(formValidationResult.error);
+    logUploadValidationFailed(requestContext.logger, {
+      importType: "gstr2b",
+      reason: "invalid_form_fields",
+    });
+    return completeApiRequest(
+      requestContext,
+      validationErrorResponse(formValidationResult.error),
+    );
   }
 
   const prisma = getPrismaClient();
@@ -233,20 +349,30 @@ async function createReferenceImportFromUpload(
     });
 
     if (!business) {
-      return apiError(
-        404,
-        "BUSINESS_NOT_FOUND",
-        "The requested business was not found.",
+      return completeApiRequest(
+        requestContext,
+        apiError(
+          404,
+          "BUSINESS_NOT_FOUND",
+          "The requested business was not found.",
+        ),
       );
     }
 
     const uploadedGstin = gstr2bValidationResult.data.gstin.toUpperCase();
 
     if (uploadedGstin !== business.gstin.toUpperCase()) {
-      return apiError(
-        400,
-        "GSTR2B_GSTIN_MISMATCH",
-        "Uploaded GSTR-2B GSTIN does not match the authenticated business.",
+      logUploadValidationFailed(requestContext.logger, {
+        importType: "gstr2b",
+        reason: "gstin_mismatch",
+      });
+      return completeApiRequest(
+        requestContext,
+        apiError(
+          400,
+          "GSTR2B_GSTIN_MISMATCH",
+          "Uploaded GSTR-2B GSTIN does not match the authenticated business.",
+        ),
       );
     }
 
@@ -258,20 +384,34 @@ async function createReferenceImportFromUpload(
       uploadedReturnPeriod &&
       formReturnPeriod !== uploadedReturnPeriod
     ) {
-      return apiError(
-        400,
-        "GSTR2B_RETURN_PERIOD_MISMATCH",
-        "Uploaded GSTR-2B return period does not match the submitted return period.",
+      logUploadValidationFailed(requestContext.logger, {
+        importType: "gstr2b",
+        reason: "return_period_mismatch",
+      });
+      return completeApiRequest(
+        requestContext,
+        apiError(
+          400,
+          "GSTR2B_RETURN_PERIOD_MISMATCH",
+          "Uploaded GSTR-2B return period does not match the submitted return period.",
+        ),
       );
     }
 
     const returnPeriod = uploadedReturnPeriod ?? formReturnPeriod;
 
     if (!returnPeriod) {
-      return apiError(
-        400,
-        "INVALID_GSTR2B_STRUCTURE",
-        "GSTR-2B return period is required.",
+      logUploadValidationFailed(requestContext.logger, {
+        importType: "gstr2b",
+        reason: "missing_return_period",
+      });
+      return completeApiRequest(
+        requestContext,
+        apiError(
+          400,
+          "INVALID_GSTR2B_STRUCTURE",
+          "GSTR-2B return period is required.",
+        ),
       );
     }
 
@@ -281,15 +421,22 @@ async function createReferenceImportFromUpload(
       derivedFinancialYear ?? formValidationResult.data.financialYear;
 
     if (!financialYear) {
-      return apiError(
-        400,
-        "VALIDATION_ERROR",
-        "The request contains invalid fields.",
-        {
-          financialYear: [
-            "financialYear is required when returnPeriod is not in MMYYYY format.",
-          ],
-        },
+      logUploadValidationFailed(requestContext.logger, {
+        importType: "gstr2b",
+        reason: "missing_financial_year",
+      });
+      return completeApiRequest(
+        requestContext,
+        apiError(
+          400,
+          "VALIDATION_ERROR",
+          "The request contains invalid fields.",
+          {
+            financialYear: [
+              "financialYear is required when returnPeriod is not in MMYYYY format.",
+            ],
+          },
+        ),
       );
     }
 
@@ -308,20 +455,57 @@ async function createReferenceImportFromUpload(
     revalidatePath("/");
     revalidatePath("/reference-imports");
 
-    return successResponse(referenceImport, {
-      status: 201,
-    });
-  } catch (error) {
-    console.error("Failed to create reference import from upload", error);
+    requestContext.logger.info(
+      {
+        event: "reference_import.completed",
+        importId: referenceImport.id,
+        importType: "gstr2b",
+        documentCount: gstr2bValidationResult.data.totalDocuments,
+      },
+      "Reference import upload completed",
+    );
 
-    return apiError(
-      500,
-      "INTERNAL_SERVER_ERROR",
-      "An unexpected server error occurred.",
+    return completeApiRequest(
+      requestContext,
+      successResponse(referenceImport, {
+        status: 201,
+      }),
+      {
+        importId: referenceImport.id,
+      },
+    );
+  } catch (error) {
+    requestContext.logger.error(
+      {
+        event: "reference_import.failed",
+        importType: "gstr2b",
+        err: error,
+      },
+      "Reference import upload failed",
+    );
+    logApiRequestFailure(requestContext, error);
+
+    return completeApiRequest(
+      requestContext,
+      apiError(
+        500,
+        "INTERNAL_SERVER_ERROR",
+        "An unexpected server error occurred.",
+      ),
     );
   }
 }
 
-function uploadErrorResponse(error: UploadValidationError) {
+function uploadErrorResponse(
+  requestContext: ApiRequestLogContext,
+  error: UploadValidationError,
+  importType: "gstr2b",
+) {
+  logUploadValidationFailed(requestContext.logger, {
+    importType,
+    reason: error.code,
+    statusCode: error.status,
+  });
+
   return apiError(error.status, error.code, error.message, error.details);
 }

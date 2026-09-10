@@ -5,6 +5,12 @@ import {
 } from "@/lib/api-response";
 import { requireApiUser } from "@/lib/api-auth";
 import { getPrismaClient } from "@/lib/prisma";
+import {
+  completeApiRequest,
+  createApiRequestLogContext,
+  logApiRequestFailure,
+  logUnauthorizedRequest,
+} from "@/lib/request-logging";
 import { referenceImportRouteParamsSchema } from "@/lib/validation/reconciliation";
 
 type ReferenceImportRouteContext = {
@@ -58,13 +64,18 @@ const referenceImportSelect = {
 } as const;
 
 export async function GET(
-  _request: Request,
+  request: Request,
   { params }: ReferenceImportRouteContext,
 ) {
+  const requestContext = createApiRequestLogContext(
+    request,
+    "/api/reference-imports/[referenceImportId]",
+  );
   const authResult = await requireApiUser();
 
   if (!authResult.success) {
-    return authResult.response;
+    logUnauthorizedRequest(requestContext);
+    return completeApiRequest(requestContext, authResult.response);
   }
 
   const validationResult = referenceImportRouteParamsSchema.safeParse(
@@ -72,7 +83,10 @@ export async function GET(
   );
 
   if (!validationResult.success) {
-    return validationErrorResponse(validationResult.error);
+    return completeApiRequest(
+      requestContext,
+      validationErrorResponse(validationResult.error),
+    );
   }
 
   const { referenceImportId } = validationResult.data;
@@ -89,21 +103,37 @@ export async function GET(
     });
 
     if (!referenceImport) {
-      return apiError(
-        404,
-        "REFERENCE_IMPORT_NOT_FOUND",
-        "The requested reference import was not found.",
+      return completeApiRequest(
+        requestContext,
+        apiError(
+          404,
+          "REFERENCE_IMPORT_NOT_FOUND",
+          "The requested reference import was not found.",
+        ),
+        {
+          importId: referenceImportId,
+        },
       );
     }
 
-    return successResponse(referenceImport);
+    return completeApiRequest(requestContext, successResponse(referenceImport), {
+      importId: referenceImportId,
+    });
   } catch (error) {
-    console.error("Failed to retrieve reference import", error);
+    logApiRequestFailure(requestContext, error, {
+      importId: referenceImportId,
+    });
 
-    return apiError(
-      500,
-      "INTERNAL_SERVER_ERROR",
-      "An unexpected server error occurred.",
+    return completeApiRequest(
+      requestContext,
+      apiError(
+        500,
+        "INTERNAL_SERVER_ERROR",
+        "An unexpected server error occurred.",
+      ),
+      {
+        importId: referenceImportId,
+      },
     );
   }
 }
