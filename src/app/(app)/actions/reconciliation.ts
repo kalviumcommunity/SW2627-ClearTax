@@ -4,9 +4,12 @@ import { revalidatePath } from "next/cache";
 
 import { requireAuthContext } from "@/lib/auth";
 import { getPrismaClient } from "@/lib/prisma";
-import { createOwnedReferenceImportSchema } from "@/lib/validation/reconciliation";
+import {
+  createOwnedReferenceImportSchema,
+  type CreateOwnedReferenceImportInput,
+} from "@/lib/validation/reconciliation";
 
-type CreateReconciliationSetupInput = unknown;
+type CreateReconciliationSetupInput = CreateOwnedReferenceImportInput;
 
 export async function createReconciliationSetup(
   input: CreateReconciliationSetupInput,
