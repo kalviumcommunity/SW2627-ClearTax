@@ -3,6 +3,7 @@ import { connection } from "next/server";
 import PageContainer from "@/components/layout/PageContainer";
 import Card from "@/components/ui/Card";
 import { requireCurrentUser } from "@/lib/auth";
+import { logger } from "@/lib/logger";
 import { getPrismaClient, withDatabaseRetry } from "@/lib/prisma";
 import type { UploadBatchStatus } from "@/generated/prisma/client";
 
@@ -50,7 +51,13 @@ export default async function ReconciliationsPage() {
     );
   } catch (error) {
     batchesError = true;
-    console.error("Failed to load reconciliation batches", error);
+    logger.error(
+      {
+        event: "reconciliation_batches.page_load_failed",
+        err: error,
+      },
+      "Failed to load reconciliation batches",
+    );
   }
 
   return (

@@ -5,6 +5,12 @@ import {
 } from "@/lib/api-response";
 import { requireApiUser } from "@/lib/api-auth";
 import { getPrismaClient } from "@/lib/prisma";
+import {
+  completeApiRequest,
+  createApiRequestLogContext,
+  logApiRequestFailure,
+  logUnauthorizedRequest,
+} from "@/lib/request-logging";
 import { batchRouteParamsSchema } from "@/lib/validation/reconciliation";
 
 type BatchRouteContext = {
@@ -50,17 +56,25 @@ const batchSelect = {
   },
 } as const;
 
-export async function GET(_request: Request, { params }: BatchRouteContext) {
+export async function GET(request: Request, { params }: BatchRouteContext) {
+  const requestContext = createApiRequestLogContext(
+    request,
+    "/api/reconciliation-batches/[batchId]",
+  );
   const authResult = await requireApiUser();
 
   if (!authResult.success) {
-    return authResult.response;
+    logUnauthorizedRequest(requestContext);
+    return completeApiRequest(requestContext, authResult.response);
   }
 
   const validationResult = batchRouteParamsSchema.safeParse(await params);
 
   if (!validationResult.success) {
-    return validationErrorResponse(validationResult.error);
+    return completeApiRequest(
+      requestContext,
+      validationErrorResponse(validationResult.error),
+    );
   }
 
   const { batchId } = validationResult.data;
@@ -77,21 +91,37 @@ export async function GET(_request: Request, { params }: BatchRouteContext) {
     });
 
     if (!batch) {
-      return apiError(
-        404,
-        "BATCH_NOT_FOUND",
-        "The requested reconciliation batch was not found.",
+      return completeApiRequest(
+        requestContext,
+        apiError(
+          404,
+          "BATCH_NOT_FOUND",
+          "The requested reconciliation batch was not found.",
+        ),
+        {
+          batchId,
+        },
       );
     }
 
-    return successResponse(batch);
+    return completeApiRequest(requestContext, successResponse(batch), {
+      batchId,
+    });
   } catch (error) {
-    console.error("Failed to retrieve reconciliation batch", error);
+    logApiRequestFailure(requestContext, error, {
+      batchId,
+    });
 
-    return apiError(
-      500,
-      "INTERNAL_SERVER_ERROR",
-      "An unexpected server error occurred.",
+    return completeApiRequest(
+      requestContext,
+      apiError(
+        500,
+        "INTERNAL_SERVER_ERROR",
+        "An unexpected server error occurred.",
+      ),
+      {
+        batchId,
+      },
     );
   }
 }

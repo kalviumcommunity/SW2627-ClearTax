@@ -6,6 +6,12 @@ import {
 import { requireApiUser } from "@/lib/api-auth";
 import { getPrismaClient } from "@/lib/prisma";
 import {
+  completeApiRequest,
+  createApiRequestLogContext,
+  logApiRequestFailure,
+  logUnauthorizedRequest,
+} from "@/lib/request-logging";
+import {
   batchRouteParamsSchema,
   reconciliationResultsQuerySchema,
 } from "@/lib/validation/reconciliation";
@@ -64,16 +70,24 @@ export async function GET(
   request: Request,
   { params }: BatchResultsRouteContext,
 ) {
+  const requestContext = createApiRequestLogContext(
+    request,
+    "/api/reconciliation-batches/[batchId]/results",
+  );
   const authResult = await requireApiUser();
 
   if (!authResult.success) {
-    return authResult.response;
+    logUnauthorizedRequest(requestContext);
+    return completeApiRequest(requestContext, authResult.response);
   }
 
   const paramsValidationResult = batchRouteParamsSchema.safeParse(await params);
 
   if (!paramsValidationResult.success) {
-    return validationErrorResponse(paramsValidationResult.error);
+    return completeApiRequest(
+      requestContext,
+      validationErrorResponse(paramsValidationResult.error),
+    );
   }
 
   const searchParams = new URL(request.url).searchParams;
@@ -83,7 +97,10 @@ export async function GET(
   });
 
   if (!queryValidationResult.success) {
-    return validationErrorResponse(queryValidationResult.error);
+    return completeApiRequest(
+      requestContext,
+      validationErrorResponse(queryValidationResult.error),
+    );
   }
 
   const { batchId } = paramsValidationResult.data;
@@ -103,10 +120,16 @@ export async function GET(
     });
 
     if (!batch) {
-      return apiError(
-        404,
-        "BATCH_NOT_FOUND",
-        "The requested reconciliation batch was not found.",
+      return completeApiRequest(
+        requestContext,
+        apiError(
+          404,
+          "BATCH_NOT_FOUND",
+          "The requested reconciliation batch was not found.",
+        ),
+        {
+          batchId,
+        },
       );
     }
 
@@ -122,10 +145,16 @@ export async function GET(
       });
 
       if (!cursorRow) {
-        return apiError(
-          400,
-          "INVALID_CURSOR",
-          "The requested cursor was not found for this reconciliation batch.",
+        return completeApiRequest(
+          requestContext,
+          apiError(
+            400,
+            "INVALID_CURSOR",
+            "The requested cursor was not found for this reconciliation batch.",
+          ),
+          {
+            batchId,
+          },
         );
       }
     }
@@ -153,20 +182,36 @@ export async function GET(
     const results = hasMore ? rows.slice(0, limit) : rows;
     const nextCursor = hasMore ? results[results.length - 1]?.id : null;
 
-    return successResponse({
-      results,
-      pagination: {
-        nextCursor,
+    return completeApiRequest(
+      requestContext,
+      successResponse({
+        results,
+        pagination: {
+          nextCursor,
+          hasMore,
+        },
+      }),
+      {
+        batchId,
+        resultCount: results.length,
         hasMore,
       },
-    });
+    );
   } catch (error) {
-    console.error("Failed to retrieve reconciliation batch results", error);
+    logApiRequestFailure(requestContext, error, {
+      batchId,
+    });
 
-    return apiError(
-      500,
-      "INTERNAL_SERVER_ERROR",
-      "An unexpected server error occurred.",
+    return completeApiRequest(
+      requestContext,
+      apiError(
+        500,
+        "INTERNAL_SERVER_ERROR",
+        "An unexpected server error occurred.",
+      ),
+      {
+        batchId,
+      },
     );
   }
 }

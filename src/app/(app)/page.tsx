@@ -234,7 +234,15 @@ export default async function DashboardPage() {
           View history
         </Link>
       </div>
-      <UploadProgress />
+      <UploadProgress
+        referenceImports={recentImports.map((referenceImport) => ({
+          id: referenceImport.id,
+          originalFilename: referenceImport.originalFilename,
+          financialYear: referenceImport.financialYear,
+          returnPeriod: referenceImport.returnPeriod,
+          status: referenceImport.status,
+        }))}
+      />
 
       {dashboardDataError ? (
         <Card className="mt-6 border-warning bg-warning-surface p-5">

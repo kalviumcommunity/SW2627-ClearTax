@@ -3,6 +3,7 @@ import type { AuthOptions, User } from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
 import GoogleProvider from "next-auth/providers/google";
 import { getAuthSecret } from "@/lib/auth-env";
+import { logger } from "@/lib/logger";
 import { getPrismaClient } from "@/lib/prisma";
 import { OWNER_ROLE, type AuthContext } from "@/lib/auth-context";
 import { loginSchema } from "@/lib/validation/auth";
@@ -220,7 +221,13 @@ function logCredentialsAuthError(error: unknown) {
           name: "UnknownError",
         };
 
-  console.error("Credentials authentication failed unexpectedly", details);
+  logger.error(
+    {
+      event: "auth.credentials.failed",
+      ...details,
+    },
+    "Credentials authentication failed unexpectedly",
+  );
 }
 
 function getGoogleProvider() {
